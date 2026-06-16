@@ -1,0 +1,156 @@
+spring:
+  application:
+    name: school-dormitory-system
+
+  # MySQL DataSource
+  datasource:
+    url: jdbc:mysql://localhost:3306/school_dormitory?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: your-mysql-password
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      connection-timeout: 20000
+
+  # Redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password:
+      database: 0
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 4
+          max-wait: 3000ms
+
+  # RabbitMQ
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    virtual-host: /
+    listener:
+      simple:
+        acknowledge-mode: manual
+        prefetch: 10
+        retry:
+          enabled: true
+          max-attempts: 3
+
+  # Mail
+  mail:
+    host: smtp.example.com
+    port: 587
+    username: noreply@example.com
+    password: your-email-password
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+  # Spring AI (OpenAI)
+  ai:
+    openai:
+      api-key: your-openai-api-key
+      base-url: https://api.openai.com
+      chat:
+        options:
+          model: gpt-3.5-turbo
+          temperature: 0.7
+
+  # File upload
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 100MB
+
+# MyBatis-Plus
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: org.java.backed.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+    banner: false
+
+# Server
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+# Logging
+logging:
+  level:
+    root: INFO
+    org.java.backed: DEBUG
+    com.baomidou.mybatisplus: DEBUG
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n'
+
+# Alipay Sandbox Config
+alipay:
+  app-id: your-sandbox-app-id
+  private-key: your-private-key
+  alipay-public-key: your-alipay-public-key
+  gateway-url: https://openapi-sandbox.dl.alipaydev.com/gateway.do
+  notify-url: http://your-domain/api/payment/notify
+  return-url: http://your-domain/payment/result
+  charset: UTF-8
+  format: json
+  sign-type: RSA2
+
+# Notification config
+notification:
+  email:
+    enabled: true
+    max-retry: 3
+    rate-limit-per-day: 5
+  sms:
+    enabled: false
+    rate-limit-per-day: 3
+
+# AI Q&A config
+ai:
+  rate-limit:
+    max-requests-per-minute: 5
+  cache:
+    ttl-seconds: 3600
+  fallback:
+    enabled: true
+
+# Scheduled tasks
+schedule:
+  overdue-check: "0 0 8 * * ?"
+  stats-precompute: "0 0 2 * * ?"
+  order-timeout: "0 */5 * * * ?"
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always

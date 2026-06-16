@@ -1,0 +1,28 @@
+# ===== 后端 =====
+backed/target/
+backed/.idea/
+*.class
+*.jar
+*.log
+
+# ===== 前端 =====
+fronted/node_modules/
+fronted/dist/
+
+# ===== IDE =====
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+
+# ===== 配置文件（含密码，不提交） =====
+backed/src/main/resources/application.yaml
+
+# ===== 环境 =====
+.env
+.env.local
