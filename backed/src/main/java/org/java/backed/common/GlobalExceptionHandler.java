@@ -1,7 +1,9 @@
 package org.java.backed.common;
 
 import lombok.extern.slf4j.Slf4j;
+import org.java.backed.ai.exception.AiServiceException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -34,6 +36,18 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleIllegalArgumentException(IllegalArgumentException e) {
         return Result.badRequest(e.getMessage());
+    }
+
+    /**
+     * AI 服务异常处理，根据错误码返回对应的 HTTP 状态码
+     */
+    @ExceptionHandler(AiServiceException.class)
+    public ResponseEntity<Result<Void>> handleAiServiceException(AiServiceException e) {
+        AiServiceException.ErrorCode code = e.getErrorCode();
+        log.warn("AI 服务异常: code={}, message={}", code.name(), e.getMessage());
+        HttpStatus status = HttpStatus.valueOf(code.getHttpStatus());
+        return ResponseEntity.status(status)
+                .body(Result.fail(code.getHttpStatus(), e.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)

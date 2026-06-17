@@ -1,14 +1,17 @@
 services:
+  # ==================== MySQL 数据库（宿主机原生，不容器化） ====================
+  # MySQL 已在 Windows 本地运行，不放在这里
+
   # ==================== Redis 缓存 ====================
   redis:
     image: redis:7-alpine
     container_name: dormitory-redis
     restart: unless-stopped
     ports:
-      - "127.0.0.1:6379:6379"
+      - "6379:6379"
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
-      - redis-data:/data
+      - ./docker-data/redis:/data
 
   # ==================== RabbitMQ 消息队列 ====================
   rabbitmq:
@@ -19,8 +22,52 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     ports:
-      - "127.0.0.1:5673:5672"     # AMQP
-      - "127.0.0.1:15672:15672" # 管理界面
+      - "5672:5672"       # AMQP
+      - "15672:15672"     # 管理界面
 
-volumes:
-  redis-data:
+  # ==================== MinIO 对象存储（业务文件） ====================
+  minio:
+    image: minio/minio:latest
+    container_name: dormitory-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"       # API
+      - "9001:9001"       # Console
+    volumes:
+      - ./docker-data/minio:/data
+
+  # ==================== Etcd（Milvus 元数据存储） ====================
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.5
+    container_name: milvus-etcd
+    restart: unless-stopped
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - ./docker-data/etcd:/etcd
+    command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+
+  # ==================== Milvus 向量数据库 ====================
+  milvus:
+    image: milvusdb/milvus:v2.4.0
+    container_name: dormitory-milvus
+    restart: unless-stopped
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000        # 用业务 MinIO 做内部存储，端口不能冲突
+    volumes:
+      - ./docker-data/milvus:/var/lib/milvus
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    command: milvus run standalone
+    depends_on:
+      - etcd
+      - minio

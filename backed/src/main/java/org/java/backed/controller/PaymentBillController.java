@@ -55,6 +55,9 @@ public class PaymentBillController {
     @PostMapping("/generate")
     public Result<Integer> generateBills(@RequestBody Map<String, Object> params) {
         String semester = (String) params.get("semester");
+        if (semester == null || semester.isEmpty()) {
+            return Result.badRequest("学期不能为空");
+        }
         @SuppressWarnings("unchecked")
         List<Long> feeItemIds = (List<Long>) params.get("feeItemIds");
         int count = billService.generateBills(semester, feeItemIds);

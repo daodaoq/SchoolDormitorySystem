@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -55,7 +56,10 @@ public class PaymentBillServiceImpl extends ServiceImpl<PaymentBillMapper, Payme
             wrapper.in(PaymentBill::getStudentId, studentIds);
         }
         wrapper.eq(semester != null && !semester.isEmpty(), PaymentBill::getSemester, semester);
-        wrapper.eq(status != null && !status.isEmpty(), PaymentBill::getStatus, status);
+        if (status != null && !status.isEmpty()) {
+            String[] statuses = status.split(",");
+            wrapper.in(PaymentBill::getStatus, Arrays.asList(statuses));
+        }
         wrapper.orderByDesc(PaymentBill::getCreateTime);
 
         Page<PaymentBill> page = page(new Page<>(pageNum, pageSize), wrapper);

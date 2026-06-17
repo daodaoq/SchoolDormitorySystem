@@ -38,25 +38,47 @@ public class PaymentController {
     }
 
     /**
-     * 支付宝同步回调 (GET)
+     * 获取支付宝支付页面 HTML（浏览器直接打开此 URL 即可跳转支付宝收银台）
+     */
+    @GetMapping(value = "/pay-page/{orderNo}", produces = "text/html;charset=UTF-8")
+    public String payPage(@PathVariable String orderNo) {
+        PaymentRecord record = paymentService.lambdaQuery()
+                .eq(PaymentRecord::getOrderNo, orderNo).one();
+        log.info("【支付调试】pay-page 查询 orderNo={}, record={}", orderNo, record != null ? "存在" : "不存在");
+        if (record == null) {
+            return "<html><body><h2>订单不存在</h2></body></html>";
+        }
+        String html = record.getReceiptUrl();
+        log.info("【支付调试】pay-page receiptUrl: isNull={}, isEmpty={}, length={}",
+                html == null, html != null && html.isEmpty(), html != null ? html.length() : 0);
+        if (html == null || html.isEmpty()) {
+            return "<html><body><h2>支付页面已过期，请重新发起支付</h2></body></html>";
+        }
+        return html;
+    }
+
+    /**
+     * 支付宝同步回调 (GET) — 处理完成重定向回前端
      */
     @GetMapping("/callback")
-    public Result<String> callback(@RequestParam Map<String, String> params) {
+    public void callback(@RequestParam Map<String, String> params,
+                         jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
         log.info("支付宝同步回调: {}", params);
         try {
             boolean verified = alipayUtil.verifyCallback(params);
             if (!verified) {
-                return Result.fail("签名验证失败");
+                response.sendRedirect("http://localhost:3000/my-bills?payResult=fail");
+                return;
             }
             String orderNo = params.get("out_trade_no");
             String tradeNo = params.get("trade_no");
             paymentService.handlePaymentCallback(orderNo, tradeNo);
-            return Result.ok("支付成功");
+            response.sendRedirect("http://localhost:3000/my-bills?payResult=success");
         } catch (BusinessException e) {
-            return Result.fail(e.getCode(), e.getMessage());
+            response.sendRedirect("http://localhost:3000/my-bills?payResult=fail");
         } catch (Exception e) {
             log.error("支付回调异常", e);
-            return Result.fail("支付处理异常");
+            response.sendRedirect("http://localhost:3000/my-bills?payResult=error");
         }
     }
 

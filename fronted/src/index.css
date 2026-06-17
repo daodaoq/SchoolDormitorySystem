@@ -1,111 +1,96 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Capsule Design System — 设计令牌
+   温暖米白底 · 药丸形 · 柔色流行调色板 · 硬偏移阴影
+   ============================================================ */
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  /* 背景 & 前景 */
+  --background: 40 14% 94%;           /* #F5F5F0 暖骨色 */
+  --foreground: 0 0% 10%;             /* #1A1A1A 墨黑 */
+  --muted: 40 8% 88%;
+  --muted-foreground: 0 0% 30%;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  /* 主色 — 珊瑚红 */
+  --primary: 8 73% 64%;               /* #E85D4E */
+  --primary-foreground: 0 0% 100%;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* 次要 — 薰衣草紫 */
+  --secondary: 260 38% 83%;            /* #C5B5E0 */
+  --secondary-foreground: 260 30% 20%;
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+  /* 边框 & 输入框 */
+  --border: 0 0% 12%;                 /* #1E1E1E 近黑边框 */
+  --input: 40 8% 88%;
+  --ring: 8 73% 64%;
+
+  /* 弹窗 */
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 10%;
+
+  /* 强调色 */
+  --accent: 65 70% 56%;               /* #C4D94E 青柠 */
+  --accent-foreground: 0 0% 10%;
+
+  /* 危险色 */
+  --destructive: 8 73% 64%;
+  --destructive-foreground: 0 0% 100%;
+
+  /* 半径 — 药丸级 */
+  --radius: 1rem;                     /* 16px 基础圆角 */
+
+  /* ============================================================
+     Capsule 专用令牌（非 Tailwind 映射）
+     ============================================================ */
+  --coral:    #E85D4E;
+  --lime:     #C4D94E;
+  --lavender: #C5B5E0;
+  --sky:      #8BB4F7;
+  --violet:   #A06CE8;
+  --yellow:   #F2D160;
+  --peach:    #F5B895;
+  --mint:     #A8E6CF;
+  --outline:  #1E1E1E;
+  --shadow-color: rgba(26, 26, 26, 0.08);
+
+  /* 阴影系统 — 硬偏移无模糊 */
+  --shadow-sm: 4px 4px 0 var(--shadow-color);
+  --shadow-md: 6px 6px 0 var(--shadow-color);
+  --shadow-lg: 8px 8px 0 var(--shadow-color);
+  --shadow-xl: 12px 12px 0 var(--shadow-color);
+
+  /* 字体 */
+  --font-display: 'Bodoni Moda', 'Noto Serif SC', serif;
+  --font-body:    'Space Grotesk', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* 药丸圆角 */
+  --radius-pill: 9999px;
+  --radius-card: 2rem;
+  --radius-circle: 50%;
+
+  /* 边框 — 分层：外层卡片用 2px，内部元素用 1px */
+  --border-standard: 2px solid var(--outline);
+  --border-light: 1px solid rgba(26, 26, 26, 0.12);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-body {
-  margin: 0;
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+/* Tailwind 4 主题映射 */
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
 }

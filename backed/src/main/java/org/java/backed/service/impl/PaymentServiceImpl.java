@@ -62,9 +62,16 @@ public class PaymentServiceImpl extends ServiceImpl<PaymentRecordMapper, Payment
             wrapper.eq(PaymentRecord::getStatus, "WAITING");
             PaymentRecord existing = getOne(wrapper);
             if (existing != null) {
-                if (existing.getCreateTime().plusMinutes(15).isAfter(LocalDateTime.now())) {
+                // 有未过期的 WAITING 订单，且 receiptUrl 完好 → 直接复用
+                if (existing.getReceiptUrl() != null && !existing.getReceiptUrl().isEmpty()
+                        && existing.getCreateTime().plusMinutes(15).isAfter(LocalDateTime.now())) {
                     return existing;
                 } else {
+                    // receiptUrl 为空 或 已过期 → 关闭，重新创建
+                    log.info("【支付调试】关闭无效旧订单: orderNo={}, receiptUrl为空={}, 已过期={}",
+                            existing.getOrderNo(),
+                            existing.getReceiptUrl() == null || existing.getReceiptUrl().isEmpty(),
+                            !existing.getCreateTime().plusMinutes(15).isAfter(LocalDateTime.now()));
                     existing.setStatus("CLOSED");
                     updateById(existing);
                 }
@@ -84,10 +91,19 @@ public class PaymentServiceImpl extends ServiceImpl<PaymentRecordMapper, Payment
 
             String payForm = alipayUtil.createPayPage(orderNo, subject,
                     "账单编号: " + bill.getBillNo(), record.getAmount().toString());
+            log.info("【支付调试】createPayPage 返回: isNull={}, length={}, preview={}",
+                    payForm == null, payForm != null ? payForm.length() : 0,
+                    payForm != null ? payForm.substring(0, Math.min(200, payForm.length())) : "NULL");
 
             if (payForm != null) {
-                save(record);
                 record.setReceiptUrl(payForm);
+                log.info("【支付调试】save 前 receiptUrl length={}", record.getReceiptUrl().length());
+                save(record);
+                // 立即验证是否写入
+                PaymentRecord verify = getById(record.getId());
+                log.info("【支付调试】save 后验证 receiptUrl: isNull={}, length={}",
+                        verify != null && verify.getReceiptUrl() != null,
+                        verify != null && verify.getReceiptUrl() != null ? verify.getReceiptUrl().length() : 0);
                 return record;
             } else {
                 throw new BusinessException(500, "创建支付订单失败，请稍后重试");

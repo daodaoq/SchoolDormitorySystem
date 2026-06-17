@@ -1,5 +1,10 @@
 package org.java.backed.util;
 
+import com.alipay.api.AlipayApiException;
+import com.alipay.api.AlipayClient;
+import com.alipay.api.internal.util.AlipaySignature;
+import com.alipay.api.request.AlipayTradePagePayRequest;
+import com.alipay.api.response.AlipayTradePagePayResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.java.backed.config.AlipayConfig;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,12 +13,7 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 /**
- * 支付宝支付工具类 (Stub实现 - 需要集成真实Alipay SDK后替换)
- *
- * 集成步骤:
- * 1. 下载 alipay-sdk-java 并安装到本地Maven仓库
- * 2. 取消pom.xml中Alipay SDK依赖的 provided/optional 标记
- * 3. 替换此文件中的Stub实现为真实SDK调用
+ * 支付宝支付工具类（证书模式 · 沙箱环境）
  */
 @Slf4j
 @Component
@@ -22,60 +22,91 @@ public class AlipayUtil {
     @Autowired
     private AlipayConfig alipayConfig;
 
+    @Autowired
+    private AlipayClient alipayClient;
+
     /**
-     * 创建支付页面
+     * 创建电脑网站支付页面（返回支付宝 HTML form）
      */
     public String createPayPage(String orderNo, String subject, String body, String amount) {
-        if (!alipayConfig.isConfigured()) {
-            log.warn("支付宝沙箱未配置，返回模拟支付页面。orderNo={}", orderNo);
-            return generateMockPayForm(orderNo, subject, amount);
+        AlipayTradePagePayRequest request = new AlipayTradePagePayRequest();
+        request.setNotifyUrl(alipayConfig.getNotifyUrl());
+        request.setReturnUrl(alipayConfig.getReturnUrl());
+
+        String bizContent = String.format(
+                "{\"out_trade_no\":\"%s\",\"total_amount\":\"%.2f\",\"subject\":\"%s\",\"body\":\"%s\",\"product_code\":\"FAST_INSTANT_TRADE_PAY\"}",
+                orderNo, Double.parseDouble(amount),
+                escapeJson(subject), escapeJson(body)
+        );
+        request.setBizContent(bizContent);
+
+        // 调试日志：检查参数是否含特殊字符
+        log.info("【支付宝请求参数】orderNo={}, subject={}, body={}, amount={}", orderNo, subject, body, amount);
+        log.info("【支付宝请求 JSON】{}", bizContent);
+        if (bizContent.contains("+")) {
+            log.warn("【警告】bizContent 包含 '+' 字符，可能导致 ALI40247！");
         }
-        // TODO: 集成真实Alipay SDK
-        // AlipayClient client = ...;
-        // AlipayTradePagePayRequest request = ...;
-        // return client.pageExecute(request).getBody();
-        log.warn("Alipay SDK 未集成，使用模拟支付。orderNo={}", orderNo);
-        return generateMockPayForm(orderNo, subject, amount);
+
+        try {
+            AlipayTradePagePayResponse response = alipayClient.pageExecute(request);
+            if (response.isSuccess()) {
+                log.info("支付宝下单成功: orderNo={}", orderNo);
+                return response.getBody();
+            } else {
+                log.error("支付宝下单失败: orderNo={}, code={}, msg={}, subMsg={}",
+                        orderNo, response.getCode(), response.getMsg(), response.getSubMsg());
+                return null;
+            }
+        } catch (AlipayApiException e) {
+            log.error("支付宝 API 异常: orderNo={}, errMsg={}", orderNo, e.getErrMsg(), e);
+            return null;
+        }
     }
 
     /**
      * 验证异步通知签名
      */
     public boolean verifyNotify(Map<String, String> params) {
-        if (!alipayConfig.isConfigured()) {
-            log.warn("支付宝未配置，跳过签名验证");
-            return "TRADE_SUCCESS".equals(params.get("trade_status"));
+        try {
+            boolean valid = AlipaySignature.rsaCertCheckV1(
+                    params,
+                    alipayConfig.getResolvedAlipayPublicCertPath(),
+                    alipayConfig.getCharset(),
+                    alipayConfig.getSignType()
+            );
+            log.info("异步通知验签: outTradeNo={}, result={}", params.get("out_trade_no"), valid);
+            return valid;
+        } catch (AlipayApiException e) {
+            log.error("验签异常: errMsg={}", e.getErrMsg(), e);
+            return false;
         }
-        // TODO: 集成真实签名验证
-        // return AlipaySignature.rsaCheckV1(params, ...);
-        return true;
     }
 
     /**
-     * 验证同步回调签名
+     * 验证同步回调签名（证书模式）
      */
     public boolean verifyCallback(Map<String, String> params) {
-        return verifyNotify(params);
+        try {
+            boolean valid = AlipaySignature.rsaCertCheckV1(
+                    params,
+                    alipayConfig.getResolvedAlipayPublicCertPath(),
+                    alipayConfig.getCharset(),
+                    alipayConfig.getSignType()
+            );
+            log.info("同步回调验签: outTradeNo={}, result={}", params.get("out_trade_no"), valid);
+            return valid;
+        } catch (AlipayApiException e) {
+            log.error("验签异常: errMsg={}", e.getErrMsg(), e);
+            return false;
+        }
     }
 
-    /**
-     * 生成模拟支付表单
-     */
-    private String generateMockPayForm(String orderNo, String subject, String amount) {
-        return String.format("""
-                <form id="pay-form" action="/api/payment/callback" method="get" style="padding:30px;text-align:center;font-family:sans-serif;">
-                    <h2>沙箱模拟支付</h2>
-                    <p>订单号: %s</p>
-                    <p>商品: %s</p>
-                    <p style="font-size:24px;color:#f60;">金额: ¥%s</p>
-                    <input type="hidden" name="out_trade_no" value="%s"/>
-                    <input type="hidden" name="trade_no" value="SIM%s"/>
-                    <input type="hidden" name="trade_status" value="TRADE_SUCCESS"/>
-                    <button type="submit" style="padding:12px 40px;background:#1677ff;color:#fff;border:none;border-radius:6px;font-size:16px;cursor:pointer;">
-                        确认支付 ¥%s
-                    </button>
-                    <p style="color:#999;margin-top:12px;">* 这是模拟支付页面，实际部署时替换为支付宝沙箱支付</p>
-                </form>
-                """, orderNo, subject, amount, orderNo, System.currentTimeMillis(), amount);
+    private String escapeJson(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
 }

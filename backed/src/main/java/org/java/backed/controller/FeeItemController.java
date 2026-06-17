@@ -55,6 +55,15 @@ public class FeeItemController {
         if (feeItem.getItemName() == null || feeItem.getItemName().isEmpty()) {
             return Result.badRequest("收费项目名称不能为空");
         }
+        if (feeItem.getFeeType() == null || feeItem.getFeeType().isEmpty()) {
+            return Result.badRequest("收费类型不能为空");
+        }
+        if (feeItem.getUnitPrice() == null) {
+            return Result.badRequest("收费单价不能为空");
+        }
+        if (feeItem.getBillingCycle() == null || feeItem.getBillingCycle().isEmpty()) {
+            return Result.badRequest("计费周期不能为空");
+        }
         feeItemService.addFeeItem(feeItem);
         return Result.ok(feeItem);
     }
@@ -64,6 +73,18 @@ public class FeeItemController {
      */
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody FeeItem feeItem) {
+        if (feeItem.getItemName() == null || feeItem.getItemName().isEmpty()) {
+            return Result.badRequest("收费项目名称不能为空");
+        }
+        if (feeItem.getFeeType() == null || feeItem.getFeeType().isEmpty()) {
+            return Result.badRequest("收费类型不能为空");
+        }
+        if (feeItem.getUnitPrice() == null) {
+            return Result.badRequest("收费单价不能为空");
+        }
+        if (feeItem.getBillingCycle() == null || feeItem.getBillingCycle().isEmpty()) {
+            return Result.badRequest("计费周期不能为空");
+        }
         feeItem.setId(id);
         feeItemService.updateFeeItem(feeItem);
         return Result.ok();

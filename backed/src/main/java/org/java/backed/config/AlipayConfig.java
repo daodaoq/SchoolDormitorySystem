@@ -1,12 +1,28 @@
 package org.java.backed.config;
 
+import com.alipay.api.AlipayApiException;
+import com.alipay.api.AlipayClient;
+import com.alipay.api.DefaultAlipayClient;
+import jakarta.annotation.PostConstruct;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
+
+import java.io.File;
+import java.io.IOException;
 
 /**
- * 支付宝沙箱配置 (Alipay SDK stub - 替换为真实SDK后启用)
+ * 支付宝沙箱配置（证书模式）
+ * <p>
+ * 使用支付宝公钥证书方式签名，需要三份证书：
+ * - appPublicCert.crt   应用公钥证书
+ * - alipayPublicCert.crt 支付宝公钥证书
+ * - alipayRootCert.crt  支付宝根证书
  */
+@Slf4j
 @Data
 @Configuration
 @ConfigurationProperties(prefix = "alipay")
@@ -14,7 +30,9 @@ public class AlipayConfig {
 
     private String appId;
     private String privateKey;
-    private String alipayPublicKey;
+    private String appCertPath;
+    private String alipayPublicCertPath;
+    private String rootCertPath;
     private String gatewayUrl;
     private String notifyUrl;
     private String returnUrl;
@@ -22,8 +40,55 @@ public class AlipayConfig {
     private String format = "json";
     private String signType = "RSA2";
 
-    public boolean isConfigured() {
-        return appId != null && !appId.isEmpty()
-                && !"your-sandbox-app-id".equals(appId);
+    /** 解析后的文件系统绝对路径 */
+    private String resolvedAppCertPath;
+    private String resolvedAlipayPublicCertPath;
+    private String resolvedRootCertPath;
+
+    @PostConstruct
+    public void resolvePaths() {
+        this.resolvedAppCertPath = resolveClasspath(appCertPath);
+        this.resolvedAlipayPublicCertPath = resolveClasspath(alipayPublicCertPath);
+        this.resolvedRootCertPath = resolveClasspath(rootCertPath);
+        log.info("证书路径解析完成: appCert={}, alipayCert={}, rootCert={}",
+                resolvedAppCertPath, resolvedAlipayPublicCertPath, resolvedRootCertPath);
+    }
+
+    /**
+     * 解析 classpath 资源为文件系统绝对路径（Alipay SDK 需要）
+     */
+    private String resolveClasspath(String path) {
+        if (path == null) return null;
+        try {
+            ClassPathResource resource = new ClassPathResource(path);
+            File file = resource.getFile();
+            return file.getAbsolutePath();
+        } catch (IOException e) {
+            log.error("解析证书路径失败: {}", path, e);
+            return path; // fallback
+        }
+    }
+
+    @Bean
+    public AlipayClient alipayClient() {
+        com.alipay.api.AlipayConfig sdkConfig = new com.alipay.api.AlipayConfig();
+        sdkConfig.setServerUrl(gatewayUrl);
+        sdkConfig.setAppId(appId);
+        sdkConfig.setPrivateKey(privateKey);
+        sdkConfig.setFormat(format);
+        sdkConfig.setCharset(charset);
+        sdkConfig.setSignType(signType);
+        // 证书模式
+        sdkConfig.setAppCertPath(resolvedAppCertPath);
+        sdkConfig.setAlipayPublicCertPath(resolvedAlipayPublicCertPath);
+        sdkConfig.setRootCertPath(resolvedRootCertPath);
+
+        try {
+            log.info("支付宝证书模式 AlipayClient 初始化: appId={}", appId);
+            return new DefaultAlipayClient(sdkConfig);
+        } catch (AlipayApiException e) {
+            log.error("AlipayClient 初始化失败: {}", e.getErrMsg(), e);
+            throw new RuntimeException("支付宝客户端初始化失败: " + e.getErrMsg(), e);
+        }
     }
 }

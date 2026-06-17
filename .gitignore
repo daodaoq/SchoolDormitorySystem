@@ -23,6 +23,9 @@ Thumbs.db
 # ===== 配置文件（含密码，不提交） =====
 backed/src/main/resources/application.yaml
 
+# ===== Docker 数据卷 =====
+docker-data/
+
 # ===== 环境 =====
 .env
 .env.local

@@ -28,6 +28,9 @@ public class StudentDormitory {
 
     private String paymentStatus;
 
+    /** 学生照片 URL（MinIO 存储） */
+    private String photo;
+
     @TableLogic
     private Integer deleted;
 
