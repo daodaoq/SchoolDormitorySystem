@@ -5,15 +5,16 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.java.backed.ai.kb.DocumentProcessingPipeline;
 import org.java.backed.ai.kb.EmbeddingService;
 import org.java.backed.ai.kb.MilvusVectorStoreService;
+import org.java.backed.config.RabbitMQConfig;
 import org.java.backed.entity.KbChunk;
 import org.java.backed.entity.KbDocument;
 import org.java.backed.mapper.KbChunkMapper;
 import org.java.backed.mapper.KbDocumentMapper;
 import org.java.backed.service.KbDocumentService;
 import org.java.backed.service.MinioService;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -30,7 +31,7 @@ public class KbDocumentServiceImpl extends ServiceImpl<KbDocumentMapper, KbDocum
         implements KbDocumentService {
 
     private final MinioService minioService;
-    private final DocumentProcessingPipeline pipeline;
+    private final RabbitTemplate rabbitTemplate;
     private final EmbeddingService embeddingService;
     private final MilvusVectorStoreService milvusService;
     private final KbChunkMapper chunkMapper;
@@ -58,8 +59,11 @@ public class KbDocumentServiceImpl extends ServiceImpl<KbDocumentMapper, KbDocum
         doc.setStatus("PENDING");
         save(doc);
 
-        // 3. 异步触发处理流水线
-        pipeline.processAsync(doc.getId());
+        // 3. 通过 RabbitMQ 异步触发处理流水线
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.EXCHANGE_KB_DOCUMENT,
+                RabbitMQConfig.RK_KB_DOCUMENT_PROCESS,
+                String.valueOf(doc.getId()));
 
         log.info("知识库文档上传成功: id={}, fileName={}", doc.getId(), doc.getFileName());
         return doc;
@@ -115,7 +119,10 @@ public class KbDocumentServiceImpl extends ServiceImpl<KbDocumentMapper, KbDocum
         doc.setChunkCount(0);
         doc.setErrorMsg(null);
         updateById(doc);
-        pipeline.processAsync(id);
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.EXCHANGE_KB_DOCUMENT,
+                RabbitMQConfig.RK_KB_DOCUMENT_PROCESS,
+                String.valueOf(id));
     }
 
     @Override
@@ -132,12 +139,22 @@ public class KbDocumentServiceImpl extends ServiceImpl<KbDocumentMapper, KbDocum
             // 2. Milvus 语义搜索
             List<MilvusVectorStoreService.SearchResult> results = milvusService.search(queryVec, topK);
 
-            // 3. 组装返回结果
+            // 3. 批量查文档标题
+            Map<Long, String> docTitles = new HashMap<>();
+            for (var r : results) {
+                if (!docTitles.containsKey(r.docId())) {
+                    KbDocument doc = getById(r.docId());
+                    docTitles.put(r.docId(), doc != null ? doc.getTitle() : "未知文档");
+                }
+            }
+
+            // 4. 组装返回结果（含文档标题供引用）
             List<Map<String, Object>> output = new ArrayList<>();
             for (var r : results) {
                 Map<String, Object> item = new LinkedHashMap<>();
                 item.put("chunkId", r.chunkId());
                 item.put("docId", r.docId());
+                item.put("docTitle", docTitles.getOrDefault(r.docId(), "未知文档"));
                 item.put("content", r.content());
                 item.put("score", Math.round(r.score() * 10000.0) / 10000.0);
                 output.add(item);

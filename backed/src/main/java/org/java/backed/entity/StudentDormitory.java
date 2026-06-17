@@ -31,6 +31,9 @@ public class StudentDormitory {
     /** 学生照片 URL（MinIO 存储） */
     private String photo;
 
+    /** 关联的系统用户ID（sys_user.id），可为空 */
+    private Long userId;
+
     @TableLogic
     private Integer deleted;
 

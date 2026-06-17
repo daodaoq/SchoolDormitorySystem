@@ -9,6 +9,7 @@ import org.java.backed.entity.PaymentRecord;
 import org.java.backed.service.PaymentService;
 import org.java.backed.util.AlipayUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -57,28 +58,32 @@ public class PaymentController {
         return html;
     }
 
+    @Value("${app.frontend-url:http://localhost:3001}")
+    private String frontendUrl;
+
     /**
-     * 支付宝同步回调 (GET) — 处理完成重定向回前端
+     * 支付宝同步回调 (GET) — 支付完成后重定向回前端
      */
     @GetMapping("/callback")
     public void callback(@RequestParam Map<String, String> params,
                          jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
         log.info("支付宝同步回调: {}", params);
+        String redirectBase = frontendUrl + "/my-bills";
         try {
             boolean verified = alipayUtil.verifyCallback(params);
             if (!verified) {
-                response.sendRedirect("http://localhost:3000/my-bills?payResult=fail");
+                response.sendRedirect(redirectBase + "?payResult=fail");
                 return;
             }
             String orderNo = params.get("out_trade_no");
             String tradeNo = params.get("trade_no");
             paymentService.handlePaymentCallback(orderNo, tradeNo);
-            response.sendRedirect("http://localhost:3000/my-bills?payResult=success");
+            response.sendRedirect(redirectBase + "?payResult=success");
         } catch (BusinessException e) {
-            response.sendRedirect("http://localhost:3000/my-bills?payResult=fail");
+            response.sendRedirect(redirectBase + "?payResult=fail");
         } catch (Exception e) {
             log.error("支付回调异常", e);
-            response.sendRedirect("http://localhost:3000/my-bills?payResult=error");
+            response.sendRedirect(redirectBase + "?payResult=error");
         }
     }
 

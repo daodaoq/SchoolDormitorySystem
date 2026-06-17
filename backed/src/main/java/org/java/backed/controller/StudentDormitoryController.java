@@ -1,11 +1,15 @@
 package org.java.backed.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
 import org.java.backed.common.PageResult;
 import org.java.backed.common.Result;
 import org.java.backed.entity.Dormitory;
 import org.java.backed.entity.StudentDormitory;
+import org.java.backed.entity.SysUser;
+import org.java.backed.mapper.SysUserMapper;
 import org.java.backed.service.DormitoryService;
 import org.java.backed.service.MinioService;
 import org.java.backed.service.StudentDormitoryService;
@@ -19,6 +23,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
@@ -33,6 +39,9 @@ public class StudentDormitoryController {
 
     @Autowired
     private DormitoryService dormitoryService;
+
+    @Autowired
+    private SysUserMapper sysUserMapper;
 
     /**
      * 分页+多条件查询
@@ -156,6 +165,90 @@ public class StudentDormitoryController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + filename)
                 .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(data);
+    }
+
+    /**
+     * 人员管理 - 分页查询学生及关联账号信息
+     */
+    @GetMapping("/personnel")
+    public Result<PageResult<Map<String, Object>>> queryPersonnel(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int pageSize,
+            @RequestParam(required = false) String studentName,
+            @RequestParam(required = false) String studentNo,
+            @RequestParam(required = false) String dormitoryNo,
+            @RequestParam(required = false) Boolean linked) {
+        LambdaQueryWrapper<StudentDormitory> wrapper = new LambdaQueryWrapper<>();
+        wrapper.like(studentName != null, StudentDormitory::getStudentName, studentName);
+        wrapper.eq(studentNo != null, StudentDormitory::getStudentNo, studentNo);
+        wrapper.like(dormitoryNo != null, StudentDormitory::getDormitoryNo, dormitoryNo);
+        if (linked != null) {
+            if (linked) wrapper.isNotNull(StudentDormitory::getUserId);
+            else wrapper.isNull(StudentDormitory::getUserId);
+        }
+        wrapper.orderByDesc(StudentDormitory::getCreateTime);
+        Page<StudentDormitory> result = studentService.page(new Page<>(page, pageSize), wrapper);
+
+        List<Map<String, Object>> enriched = result.getRecords().stream().map(s -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", s.getId());
+            m.put("studentName", s.getStudentName());
+            m.put("studentNo", s.getStudentNo());
+            m.put("dormitoryNo", s.getDormitoryNo());
+            m.put("phone", s.getPhone());
+            m.put("checkInDate", s.getCheckInDate());
+            m.put("paymentStatus", s.getPaymentStatus());
+            m.put("photo", s.getPhoto());
+            m.put("userId", s.getUserId());
+            m.put("createTime", s.getCreateTime());
+            if (s.getUserId() != null) {
+                SysUser u = sysUserMapper.selectById(s.getUserId());
+                if (u != null) {
+                    m.put("username", u.getUsername());
+                    m.put("userStatus", u.getStatus());
+                }
+            }
+            return m;
+        }).collect(Collectors.toList());
+
+        return Result.ok(PageResult.of(enriched, result.getTotal(), result.getCurrent(), result.getSize()));
+    }
+
+    /**
+     * 关联学生记录到系统用户
+     */
+    @PutMapping("/{id}/link-user")
+    public Result<Void> linkUser(@PathVariable Long id, @RequestBody Map<String, Long> params) {
+        Long userId = params.get("userId");
+        if (userId == null) return Result.badRequest("userId不能为空");
+
+        StudentDormitory student = studentService.getById(id);
+        if (student == null) return Result.notFound("学生记录不存在");
+
+        SysUser user = sysUserMapper.selectById(userId);
+        if (user == null) return Result.notFound("用户不存在");
+        if (!"STUDENT".equals(user.getRole())) return Result.badRequest("只能关联STUDENT角色的用户");
+
+        // 检查该用户是否已经关联到其他学生记录
+        LambdaQueryWrapper<StudentDormitory> checkWrapper = new LambdaQueryWrapper<>();
+        checkWrapper.eq(StudentDormitory::getUserId, userId);
+        if (studentService.count(checkWrapper) > 0) return Result.conflict("该用户已关联到其他学生记录");
+
+        student.setUserId(userId);
+        studentService.updateById(student);
+        return Result.ok();
+    }
+
+    /**
+     * 取消学生记录与系统用户的关联
+     */
+    @PutMapping("/{id}/unlink-user")
+    public Result<Void> unlinkUser(@PathVariable Long id) {
+        StudentDormitory student = studentService.getById(id);
+        if (student == null) return Result.notFound("学生记录不存在");
+        student.setUserId(null);
+        studentService.updateById(student);
+        return Result.ok();
     }
 
     /**

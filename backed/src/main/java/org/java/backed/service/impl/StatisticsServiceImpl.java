@@ -11,6 +11,11 @@ import org.java.backed.service.StudentDormitoryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import org.java.backed.config.CacheConfig;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.scheduling.annotation.Scheduled;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -30,6 +35,7 @@ public class StatisticsServiceImpl implements StatisticsService {
     private PaymentService paymentService;
 
     @Override
+    @Cacheable(cacheNames = CacheConfig.CACHE_STATS, key = "'overview'")
     public Map<String, Object> getOverview() {
         Map<String, Object> overview = new LinkedHashMap<>();
 
@@ -86,6 +92,42 @@ public class StatisticsServiceImpl implements StatisticsService {
     }
 
     @Override
+    public Map<String, Object> getStudentOverview(Long studentId) {
+        Map<String, Object> overview = new LinkedHashMap<>();
+
+        LambdaQueryWrapper<PaymentBill> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(PaymentBill::getStudentId, studentId);
+        List<PaymentBill> bills = billService.list(wrapper);
+
+        long totalBills = bills.size();
+        BigDecimal totalAmount = bills.stream().map(PaymentBill::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal paidAmount = bills.stream().map(PaymentBill::getPaidAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        overview.put("totalBills", totalBills);
+        overview.put("totalAmount", totalAmount);
+        overview.put("paidAmount", paidAmount);
+
+        BigDecimal collectionRate = totalAmount.compareTo(BigDecimal.ZERO) > 0
+                ? paidAmount.multiply(BigDecimal.valueOf(100)).divide(totalAmount, 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+        overview.put("collectionRate", collectionRate);
+
+        long overdueCount = bills.stream().filter(b -> "OVERDUE".equals(b.getStatus())).count();
+        BigDecimal overdueAmount = bills.stream()
+                .filter(b -> "OVERDUE".equals(b.getStatus()))
+                .map(b -> b.getAmount().subtract(b.getPaidAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        overview.put("overdueCount", overdueCount);
+        overview.put("overdueAmount", overdueAmount);
+
+        long unpaidCount = bills.stream().filter(b -> "UNPAID".equals(b.getStatus())).count();
+        overview.put("unpaidCount", unpaidCount);
+
+        return overview;
+    }
+
+    @Override
+    @Cacheable(cacheNames = CacheConfig.CACHE_STATS, key = "'collection_' + (#semester ?: 'all')")
     public List<Map<String, Object>> getCollectionRate(String semester) {
         if (semester == null || semester.isEmpty()) semester = getCurrentSemester();
         List<Map<String, Object>> result = new ArrayList<>();

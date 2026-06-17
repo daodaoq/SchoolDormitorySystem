@@ -1,22 +1,23 @@
 package org.java.backed.ai.stream;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.java.backed.ai.config.AiProperties;
-import org.java.backed.ai.exception.AiServiceException;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 
 import java.io.IOException;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 /**
  * 流式响应处理器
  * 将 Spring AI 的 Flux<String> 流式输出桥接到 Servlet SSE (SseEmitter)
+ * 支持 RAG 上下文、对话历史、Markdown 格式回答
  */
 @Slf4j
 @Component
@@ -25,16 +26,29 @@ public class StreamingResponseHandler {
 
     private final ChatClient.Builder chatClientBuilder;
     private final AiProperties aiProperties;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
-     * 创建流式 SSE 响应
-     *
-     * @param question     用户问题
-     * @param systemPrompt 系统提示词
-     * @param modelName    模型名称
-     * @return SseEmitter SSE 发射器
+     * 流式请求参数
      */
-    public SseEmitter createStreamEmitter(String question, String systemPrompt, String modelName) {
+    public record StreamRequest(
+            String question,
+            String systemPrompt,
+            String modelName,
+            String ragContext,
+            String conversationContext,
+            List<Map<String, Object>> citations
+    ) {
+        public StreamRequest(String question, String systemPrompt, String modelName,
+                             String ragContext, String conversationContext) {
+            this(question, systemPrompt, modelName, ragContext, conversationContext, Collections.emptyList());
+        }
+    }
+
+    /**
+     * 创建流式 SSE 响应（完整参数）
+     */
+    public SseEmitter createStreamEmitter(StreamRequest request) {
         AiProperties.Stream streamConfig = aiProperties.getStream();
         long timeoutMs = streamConfig.getTimeoutSeconds() * 1000L;
         long heartbeatMs = streamConfig.getHeartbeatIntervalMs();
@@ -42,37 +56,40 @@ public class StreamingResponseHandler {
         SseEmitter emitter = new SseEmitter(timeoutMs);
 
         String streamId = UUID.randomUUID().toString().substring(0, 8);
-        log.info("创建 AI 流式响应: streamId={}, question={}", streamId,
-                question.length() > 50 ? question.substring(0, 50) + "..." : question);
+        String shortQuestion = request.question().length() > 50
+                ? request.question().substring(0, 50) + "..."
+                : request.question();
+        log.info("创建 AI 流式响应: streamId={}, question={}, hasRag={}, hasCtx={}, citations={}",
+                streamId, shortQuestion,
+                !request.ragContext().isEmpty(),
+                !request.conversationContext().isEmpty(),
+                request.citations().size());
 
         // 异步执行流式调用，避免阻塞 Servlet 线程
         CompletableFuture.runAsync(() -> {
             try {
+                String fullUserPrompt = buildFullUserPrompt(request);
+                String enhancedSystemPrompt = enhanceSystemPrompt(request.systemPrompt());
+
                 Flux<String> contentFlux = chatClientBuilder.build()
                         .prompt()
-                        .system(systemPrompt)
-                        .user(question)
+                        .system(enhancedSystemPrompt)
+                        .user(fullUserPrompt)
                         .stream()
                         .content();
 
-                // 使用数组包装 StringBuilder，因为 lambda 内需要可变引用
                 StringBuilder fullContent = new StringBuilder();
-                boolean[] contentReceived = {false};
-
-                // 启动心跳线程
                 Thread heartbeatThread = startHeartbeat(emitter, heartbeatMs, streamId);
 
                 try {
-                    // 阻塞订阅 Flux（在异步线程中执行）
                     contentFlux
                             .doOnNext(chunk -> {
-                                contentReceived[0] = true;
                                 fullContent.append(chunk);
                                 sendEvent(emitter, "content", chunk);
                             })
                             .doOnComplete(() -> {
                                 log.info("AI 流式响应完成: streamId={}, 总长度={}", streamId, fullContent.length());
-                                sendEvent(emitter, "done", "completed");
+                                sendDoneEvent(emitter, request.citations());
                                 emitter.complete();
                             })
                             .doOnError(error -> {
@@ -80,7 +97,7 @@ public class StreamingResponseHandler {
                                 sendEvent(emitter, "error", "AI 服务异常: " + error.getMessage());
                                 emitter.completeWithError(error);
                             })
-                            .blockLast(); // 阻塞当前异步线程直到流结束
+                            .blockLast();
                 } finally {
                     heartbeatThread.interrupt();
                 }
@@ -92,12 +109,73 @@ public class StreamingResponseHandler {
             }
         });
 
-        // 注册完成/超时/错误回调
         emitter.onCompletion(() -> log.debug("SSE 连接完成: streamId={}", streamId));
         emitter.onTimeout(() -> log.warn("SSE 连接超时: streamId={}", streamId));
         emitter.onError(ex -> log.error("SSE 连接异常: streamId={}", streamId, ex));
 
         return emitter;
+    }
+
+    /**
+     * 创建流式 SSE 响应（简化版，仅问题 + 系统提示词）
+     */
+    public SseEmitter createStreamEmitter(String question, String systemPrompt, String modelName) {
+        return createStreamEmitter(new StreamRequest(question, systemPrompt, modelName, "", ""));
+    }
+
+    /**
+     * 发送 done 事件，包含引用来源
+     */
+    private void sendDoneEvent(SseEmitter emitter, List<Map<String, Object>> citations) {
+        Map<String, Object> doneData = new LinkedHashMap<>();
+        doneData.put("status", "completed");
+        if (citations != null && !citations.isEmpty()) {
+            doneData.put("citations", citations);
+        }
+        try {
+            sendEvent(emitter, "done", objectMapper.writeValueAsString(doneData));
+        } catch (JsonProcessingException e) {
+            sendEvent(emitter, "done", "{\"status\":\"completed\"}");
+        }
+    }
+
+    /**
+     * 拼接完整用户 Prompt：对话历史 + RAG 参考内容 + 用户问题
+     */
+    private String buildFullUserPrompt(StreamRequest request) {
+        StringBuilder prompt = new StringBuilder();
+
+        if (!request.conversationContext().isEmpty()) {
+            prompt.append("【对话历史】\n").append(request.conversationContext()).append("\n\n");
+        }
+        if (!request.ragContext().isEmpty()) {
+            prompt.append("【参考知识库内容】\n").append(request.ragContext()).append("\n\n");
+        }
+
+        prompt.append("【用户问题】\n").append(request.question());
+
+        if (!request.ragContext().isEmpty()) {
+            prompt.append("\n请基于以上参考内容和对话历史，用中文简洁回答用户问题。");
+        }
+
+        return prompt.toString();
+    }
+
+    /**
+     * 增强系统提示词，追加简洁的 Markdown 格式要求
+     */
+    private String enhanceSystemPrompt(String basePrompt) {
+        String markdownInstruction = """
+
+                【回答格式要求 — 必须严格遵守】
+                使用 Markdown 组织回答，注意：所有标记符后面必须有一个空格！
+                - 标题：「## 标题文字」（## 后必须有空格）
+                - 有序列表：「1. 项目」（数字+点号后必须有空格）
+                - 无序列表：「- 项目」（减号后必须有空格）
+                - 粗体：「**关键词**」（双星号包裹，前后不留空格）
+                - 引用块：「> 引用文字」（> 后必须有空格）
+                - 保持简洁清晰，不要使用表格""";
+        return basePrompt + markdownInstruction;
     }
 
     /**
@@ -111,7 +189,6 @@ public class StreamingResponseHandler {
                     try {
                         emitter.send(SseEmitter.event().comment("heartbeat"));
                     } catch (IOException e) {
-                        // 连接已关闭，退出心跳
                         break;
                     }
                 }

@@ -31,13 +31,15 @@ CREATE TABLE student_dormitory (
     check_in_date DATE NOT NULL COMMENT '入住时间',
     payment_status VARCHAR(20) NOT NULL DEFAULT 'UNPAID' COMMENT '缴费状态',
     photo VARCHAR(500) DEFAULT NULL COMMENT '学生照片URL',
+    user_id BIGINT DEFAULT NULL COMMENT '关联系统用户ID (sys_user.id)',
     deleted TINYINT(1) NOT NULL DEFAULT 0 COMMENT '逻辑删除',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     UNIQUE KEY uk_student_no (student_no),
     INDEX idx_dormitory_no (dormitory_no),
     INDEX idx_payment_status (payment_status),
-    INDEX idx_student_name (student_name)
+    INDEX idx_student_name (student_name),
+    INDEX idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学生宿舍信息表';
 
 -- ==================== 2. 宿舍信息表 ====================
@@ -318,11 +320,12 @@ INSERT INTO sys_menu (id, parent_id, menu_name, menu_type, path, icon, permissio
 (11, 9, '角色管理', 'MENU', '/roles', 'SafetyOutlined', 'role:view', 2, 1),
 (12, 9, '菜单管理', 'MENU', '/menus', 'MenuOutlined', 'menu:view', 3, 1),
 (13, 0, 'AI问答', 'MENU', '/ai-qa', 'RobotOutlined', 'ai:view', 10, 1),
-(14, 0, '知识库', 'MENU', '/knowledge-base', 'BookOutlined', 'kb:view', 11, 1);
+(14, 0, '知识库', 'MENU', '/knowledge-base', 'BookOutlined', 'kb:view', 11, 1),
+(15, 9, '人员管理', 'MENU', '/personnel', 'IdcardOutlined', 'personnel:view', 4, 1);
 
 -- 角色菜单关联 (admin 拥有所有菜单)
 INSERT INTO sys_role_menu (role_id, menu_id) VALUES
-(1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10), (1, 11), (1, 12), (1, 13), (1, 14),
+(1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10), (1, 11), (1, 12), (1, 13), (1, 14), (1, 15),
 (2, 1), (2, 2), (2, 3), (2, 4), (2, 5), (2, 6), (2, 7), (2, 8), (2, 13), (2, 14),
 (3, 1), (3, 8), (3, 13);
 

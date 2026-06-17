@@ -66,6 +66,13 @@ public class AiQaController {
     @GetMapping("/health")
     public Result<Map<String, Object>> health() {
         Map<String, Object> status = aiQaService.getHealthStatus();
+        // 快速诊断：试调一次 AI（不计入日志）
+        try {
+            Map<String, Object> test = aiQaService.ask("diagnostic", "ping");
+            status.put("diagnostic", test);
+        } catch (Exception e) {
+            status.put("diagnosticError", e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
         return Result.ok(status);
     }
 

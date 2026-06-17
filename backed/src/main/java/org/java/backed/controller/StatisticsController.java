@@ -23,6 +23,14 @@ public class StatisticsController {
     }
 
     /**
+     * 学生个人缴费概览
+     */
+    @GetMapping("/student/{studentId}")
+    public Result<Map<String, Object>> studentOverview(@PathVariable Long studentId) {
+        return Result.ok(statisticsService.getStudentOverview(studentId));
+    }
+
+    /**
      * 收缴率统计(按收费类型)
      */
     @GetMapping("/collection-rate")

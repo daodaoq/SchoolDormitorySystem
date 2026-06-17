@@ -7,7 +7,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.java.backed.ai.circuit.ModelHealthMonitor;
 import org.java.backed.ai.config.AiProperties;
 import org.java.backed.ai.exception.AiServiceException;
+import org.java.backed.ai.kb.ConversationContextManager;
+import org.java.backed.ai.kb.IntentRouter;
 import org.java.backed.ai.kb.MilvusVectorStoreService;
+import org.java.backed.ai.kb.QueryRewriteService;
+import org.java.backed.ai.kb.ResponseLevelRouter;
+import org.java.backed.ai.kb.ResponseLevelRouter.ResponseLevel;
+import org.java.backed.ai.kb.RerankService;
+import org.java.backed.ai.kb.SemanticCacheService;
 import org.java.backed.ai.stream.StreamingResponseHandler;
 import org.java.backed.entity.AiQaLog;
 import org.java.backed.mapper.AiQaLogMapper;
@@ -18,8 +25,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -33,7 +40,7 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
 
     private static final String CACHE_KEY_PREFIX = "ai:qa:";
     private static final String RATE_LIMIT_KEY_PREFIX = "ai:rate:";
-    private static final String MODEL_NAME = "deepseek-chat";
+    private static final String MODEL_NAME = "deepseek-v4-flash";
 
     private final StringRedisTemplate stringRedisTemplate;
     private final ChatClient.Builder chatClientBuilder;
@@ -41,25 +48,51 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
     private final ModelHealthMonitor healthMonitor;
     private final StreamingResponseHandler streamingHandler;
     private final KbDocumentService kbDocumentService;
+    private final RerankService rerankService;
+    private final ConversationContextManager contextManager;
+    private final QueryRewriteService queryRewriteService;
+    private final SemanticCacheService semanticCache;
+    private final IntentRouter intentRouter;
+    private final ResponseLevelRouter levelRouter;
 
     public AiQaServiceImpl(StringRedisTemplate stringRedisTemplate,
                            ChatClient.Builder chatClientBuilder,
                            AiProperties aiProperties,
                            ModelHealthMonitor healthMonitor,
                            StreamingResponseHandler streamingHandler,
-                           KbDocumentService kbDocumentService) {
+                           KbDocumentService kbDocumentService,
+                           RerankService rerankService,
+                           ConversationContextManager contextManager,
+                           QueryRewriteService queryRewriteService,
+                           SemanticCacheService semanticCache,
+                           IntentRouter intentRouter,
+                           ResponseLevelRouter levelRouter) {
         this.stringRedisTemplate = stringRedisTemplate;
         this.chatClientBuilder = chatClientBuilder;
         this.aiProperties = aiProperties;
         this.healthMonitor = healthMonitor;
         this.streamingHandler = streamingHandler;
         this.kbDocumentService = kbDocumentService;
+        this.rerankService = rerankService;
+        this.contextManager = contextManager;
+        this.queryRewriteService = queryRewriteService;
+        this.semanticCache = semanticCache;
+        this.intentRouter = intentRouter;
+        this.levelRouter = levelRouter;
     }
 
     // ==================== 同步问答 ====================
 
     @Override
     public Map<String, Object> ask(String userId, String question) {
+        // 0. 分级别路由：问候/越界 → 直接返回预设回复，不调 AI
+        ResponseLevel level = levelRouter.classify(question);
+        if (level == ResponseLevel.GREETING || level == ResponseLevel.OFF_TOPIC) {
+            String reply = levelRouter.getPresetReply(level).text();
+            saveLog(userId, question, reply, level.name(), 0);
+            return buildResult(question, reply, level.name(), 1.0, 0);
+        }
+
         // 1. 限流检查
         if (!checkRateLimit(userId)) {
             int maxReq = aiProperties.getRateLimit().getMaxRequestsPerMinute();
@@ -67,24 +100,22 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
                     "RATE_LIMIT", 0, 0);
         }
 
-        // 2. 缓存检查
-        String cacheKey = CACHE_KEY_PREFIX + simpleHash(question);
-        String cached = stringRedisTemplate.opsForValue().get(cacheKey);
-        if (cached != null) {
-            return buildResult(question, cached, "CACHE", 1.0, 0);
-        }
-
-        // 3. 本地知识库匹配
-        if (aiProperties.getLocalKb().isEnabled()) {
-            String localAnswer = matchLocalKB(question);
-            if (localAnswer != null) {
-                cacheAnswer(cacheKey, localAnswer);
-                saveLog(userId, question, localAnswer, "LOCAL_KB", 0);
-                return buildResult(question, localAnswer, "LOCAL_KB", 0.9, 0);
+        // 2. 语义缓存检查（Embedding API 不可用时会降级跳过）
+        try {
+            SemanticCacheService.CachedAnswer semCached = semanticCache.lookup(question);
+            if (semCached != null) {
+                return buildResult(question, semCached.answer(),
+                        semCached.source(), semCached.similarity(), 0);
             }
+        } catch (Exception e) {
+            log.warn("语义缓存不可用，跳过: {}", e.getMessage());
         }
 
-        // 4. AI 调用（带 RAG 检索 + 熔断保护）
+        // 3. RAG + AI 调用
+        String basePrompt = aiProperties.getPrompt().getSystemText();
+        String systemPrompt = intentRouter.route(question, basePrompt);
+
+        // 4. AI 调用（带 RAG + 重排序 + 查询重写 + 对话上下文）
         String aiAnswer = null;
         int responseTime = 0;
         try {
@@ -94,39 +125,60 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
             }
 
             long startTime = System.currentTimeMillis();
-            String systemPrompt = aiProperties.getPrompt().getSystemText();
 
-            // 4a. RAG 检索：从知识库搜索相关内容
-            String ragContext = buildRagContext(question);
+            // 5a. 查询重写 → 多查询提升召回率
+            List<String> queries = queryRewriteService.rewrite(question);
+            // 对每个查询检索知识库，合并去重
+            String ragContext = buildRagContextMulti(queries);
 
             // 4b. 拼接最终 Prompt
-            String fullPrompt = question;
+            // 4c. 获取对话历史上下文（滑动窗口 + 摘要）
+            String conversationContext = contextManager.getContext(userId);
+
+            StringBuilder fullPrompt = new StringBuilder();
+            if (!conversationContext.isEmpty()) {
+                fullPrompt.append("【对话历史】\n").append(conversationContext).append("\n\n");
+            }
             if (!ragContext.isEmpty()) {
-                fullPrompt = "【参考知识库内容】\n" + ragContext
-                        + "\n【用户问题】\n" + question
-                        + "\n请基于以上参考内容和你的知识，用中文简洁回答用户问题。";
+                fullPrompt.append("【参考知识库内容】\n").append(ragContext).append("\n\n");
+            }
+            fullPrompt.append("【用户问题】\n").append(question);
+            if (!ragContext.isEmpty()) {
+                fullPrompt.append("\n请基于以上参考内容和对话历史，用中文简洁回答用户问题。");
             }
 
             aiAnswer = chatClientBuilder.build()
                     .prompt()
                     .system(systemPrompt)
-                    .user(fullPrompt)
+                    .user(fullPrompt.toString())
                     .call()
                     .content();
+
+            // 4d. 保存本轮对话到上下文管理器
+            contextManager.addAndCompact(userId, question, aiAnswer);
 
             responseTime = (int) (System.currentTimeMillis() - startTime);
             healthMonitor.markSuccess(MODEL_NAME);
             log.info("AI 调用成功: userId={}, responseTime={}ms", userId, responseTime);
 
         } catch (AiServiceException e) {
-            log.warn("AI 服务异常: {}", e.getMessage());
+            log.warn("AI 服务异常: code={}, msg={}", e.getErrorCode(), e.getMessage());
         } catch (Exception e) {
-            log.error("AI 调用异常", e);
+            log.error("AI 调用异常: type={}, msg={}", e.getClass().getSimpleName(), e.getMessage(), e);
             healthMonitor.markFailure(MODEL_NAME);
         }
 
-        // 5. 降级回复
+        // 5. 降级：AI 失败 → 本地 KB → 通用兜底
         if (aiAnswer == null || aiAnswer.trim().isEmpty()) {
+            // 先尝试本地知识库兜底
+            if (aiProperties.getLocalKb().isEnabled()) {
+                String localAnswer = matchLocalKB(question);
+                if (localAnswer != null) {
+                    saveLog(userId, question, localAnswer, "LOCAL_KB", responseTime);
+                    return buildResult(question, localAnswer, "LOCAL_KB", 0.9, responseTime);
+                }
+            }
+            // 再尝试通用降级回复
             if (aiProperties.getFallback().isEnabled()) {
                 aiAnswer = getFallbackAnswer(question);
                 saveLog(userId, question, aiAnswer, "FALLBACK", responseTime);
@@ -137,17 +189,50 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
             return buildResult(question, errorMsg, "ERROR", 0, responseTime);
         }
 
-        // 6. 缓存 & 记录
-        cacheAnswer(cacheKey, aiAnswer);
+        // 6. 语义缓存 & 记录（缓存失败不影响主流程）
+        try { semanticCache.store(question, aiAnswer, "AI"); }
+        catch (Exception e) { log.warn("语义缓存存储失败: {}", e.getMessage()); }
         saveLog(userId, question, aiAnswer, "AI", responseTime);
-        return buildResult(question, aiAnswer, "AI", 0.85, responseTime);
+        Map<String, Object> result = buildResult(question, aiAnswer, "AI", 0.85, responseTime);
+        // 附带引用来源
+        result.put("citations", getLastCitations());
+        return result;
     }
 
     // ==================== 流式问答 ====================
 
     @Override
     public SseEmitter askStream(String userId, String question) {
-        // 1. 限流检查
+        // 1. 分级别路由：问候/越界 → 直接返回预设回复
+        ResponseLevel level = levelRouter.classify(question);
+        if (level == ResponseLevel.GREETING || level == ResponseLevel.OFF_TOPIC) {
+            String reply = levelRouter.getPresetReply(level).text();
+            SseEmitter presetEmitter = new SseEmitter();
+            CompletableFuture.runAsync(() -> {
+                try {
+                    // 模拟流式逐字发送（分句发送）
+                    String[] sentences = reply.split("(?<=[。！？\\n])");
+                    for (String sentence : sentences) {
+                        if (!sentence.isEmpty()) {
+                            presetEmitter.send(SseEmitter.event()
+                                    .name("content")
+                                    .data(sentence));
+                            Thread.sleep(30);
+                        }
+                    }
+                    presetEmitter.send(SseEmitter.event()
+                            .name("done")
+                            .data("{\"status\":\"completed\",\"source\":\"" + level.name() + "\"}"));
+                    presetEmitter.complete();
+                } catch (Exception e) {
+                    presetEmitter.completeWithError(e);
+                }
+            });
+            saveLog(userId, question, reply, level.name(), 0);
+            return presetEmitter;
+        }
+
+        // 2. 限流检查
         if (!checkRateLimit(userId)) {
             SseEmitter errorEmitter = new SseEmitter();
             try {
@@ -160,7 +245,7 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
             return errorEmitter;
         }
 
-        // 2. 熔断检查
+        // 3. 熔断检查
         if (!healthMonitor.allowCall(MODEL_NAME)) {
             SseEmitter errorEmitter = new SseEmitter();
             try {
@@ -173,12 +258,38 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
             return errorEmitter;
         }
 
-        // 3. 创建流式响应
-        String systemPrompt = aiProperties.getPrompt().getSystemText();
-        SseEmitter emitter = streamingHandler.createStreamEmitter(question, systemPrompt, MODEL_NAME);
+        // 4. 构建 RAG 上下文和对话历史
+        String ragContext = "";
+        List<Map<String, Object>> citations = Collections.emptyList();
+        try {
+            List<String> queries = queryRewriteService.rewrite(question);
+            ragContext = buildRagContextMulti(queries);
+            citations = getLastCitationsSnapshot();
+        } catch (Exception e) {
+            log.debug("RAG 上下文构建跳过: {}", e.getMessage());
+        }
+        String conversationContext = contextManager.getContext(userId);
 
-        // 流完成后保存日志
-        emitter.onCompletion(() -> saveLog(userId, question, "[流式回答]", "AI_STREAM", 0));
+        // 5. 创建流式响应（带完整上下文 + 引用来源）
+        String systemPrompt = intentRouter.route(question, aiProperties.getPrompt().getSystemText());
+        StreamingResponseHandler.StreamRequest streamRequest = new StreamingResponseHandler.StreamRequest(
+                question, systemPrompt, MODEL_NAME, ragContext, conversationContext, citations);
+        SseEmitter emitter = streamingHandler.createStreamEmitter(streamRequest);
+
+        // 6. 流完成后保存日志 & 更新对话上下文
+        // 用数组保存完整回答（因 SseEmitter 回调不能直接访问外部非 final 变量）
+        String[] fullAnswer = {""};
+
+        emitter.onCompletion(() -> {
+            // 尝试从 SseEmitter 的 data 中获取完整回答比较困难，用占位标记
+            saveLog(userId, question, fullAnswer[0].isEmpty() ? "[流式回答]" : fullAnswer[0],
+                    "AI_STREAM", 0);
+            if (!fullAnswer[0].isEmpty()) {
+                contextManager.addAndCompact(userId, question, fullAnswer[0]);
+            }
+            healthMonitor.markSuccess(MODEL_NAME);
+            log.info("AI 流式响应完成: userId={}", userId);
+        });
         emitter.onError(ex -> {
             healthMonitor.markFailure(MODEL_NAME);
             log.error("流式问答失败: userId={}", userId, ex);
@@ -215,23 +326,144 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
 
     // ==================== RAG 检索 ====================
 
+    /** 存放最近一次检索的引用来源，供 buildRagContext 填充后返回给调用方 */
+    private final ThreadLocal<List<Map<String, Object>>> lastCitations = new ThreadLocal<>();
+
     /**
-     * 从知识库检索相关文档片段，构建 RAG 上下文
+     * 获取最近一次 RAG 检索的引用来源（精简版，用于 SSE done 事件）
+     */
+    public List<Map<String, Object>> getLastCitationsSnapshot() {
+        var c = lastCitations.get();
+        if (c == null || c.isEmpty()) return Collections.emptyList();
+        // 返回精简版（去掉 content 字段中的长文本，前端只需 docTitle + score）
+        List<Map<String, Object>> snapshot = new ArrayList<>();
+        for (var item : c) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("docTitle", item.get("docTitle"));
+            m.put("score", item.get("score"));
+            m.put("docId", item.get("docId"));
+            m.put("content", item.get("content"));
+            snapshot.add(m);
+        }
+        return snapshot;
+    }
+
+    /**
+     * 多查询 RAG 检索：对每个重写查询分别检索，合并去重
+     */
+    private String buildRagContextMulti(List<String> queries) {
+        Map<String, Map<String, Object>> seen = new LinkedHashMap<>(); // chunkId → result
+        for (String q : queries) {
+            try {
+                var results = kbDocumentService.search(q, 5);
+                if (results != null) {
+                    for (var r : results) {
+                        String cid = (String) r.get("chunkId");
+                        if (cid != null && !seen.containsKey(cid)
+                                && (double) r.getOrDefault("score", 0.0) > 0.3) {
+                            seen.put(cid, r);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.debug("子查询检索失败: {}", q);
+            }
+        }
+        return buildRagContextFromResults(new ArrayList<>(seen.values()), queries.get(0));
+    }
+
+    /**
+     * Rerank + 构建上下文
+     */
+    private String buildRagContextFromResults(List<Map<String, Object>> results, String query) {
+        try {
+            if (results.isEmpty()) {
+                lastCitations.set(Collections.emptyList());
+                return "";
+            }
+
+            // Rerank 精排
+            results = rerankService.rerank(query, results);
+            if (results == null || results.isEmpty()) {
+                lastCitations.set(Collections.emptyList());
+                return "";
+            }
+
+            // 过滤低相关度
+            List<Map<String, Object>> citations = results.stream()
+                    .filter(r -> (double) r.getOrDefault("score", 0.0) > 0.3)
+                    .toList();
+            lastCitations.set(citations);
+
+            if (citations.isEmpty()) return "";
+
+            // 构建纯参考上下文（不带引用格式指令）
+            StringBuilder ctx = new StringBuilder();
+            ctx.append("【参考知识库内容】\n");
+            for (int i = 0; i < citations.size(); i++) {
+                var c = citations.get(i);
+                ctx.append("[").append(i + 1).append("] ")
+                        .append("《").append(c.get("docTitle")).append("》")
+                        .append(": ").append(c.get("content")).append("\n");
+            }
+            return ctx.toString();
+        } catch (Exception e) {
+            log.warn("RAG 检索/Rerank 失败（不影响主流程）: {}", e.getMessage());
+            lastCitations.set(Collections.emptyList());
+            return "";
+        }
+    }
+
+    /**
+     * 从知识库检索 + Rerank 重排序 + 构建带来源标注的上下文（单查询）
      */
     private String buildRagContext(String question) {
         try {
-            var results = kbDocumentService.search(question, 3);
+            // 1. 向量粗筛 Top-10
+            var results = kbDocumentService.search(question, 10);
             if (results == null || results.isEmpty()) {
+                lastCitations.set(Collections.emptyList());
                 return "";
             }
-            return results.stream()
-                    .filter(r -> (double) r.getOrDefault("score", 0.0) > 0.5)
-                    .map(r -> "[" + r.get("score") + "] " + r.get("content"))
-                    .collect(Collectors.joining("\n---\n"));
+
+            // 2. Rerank 精排 Top-3
+            results = rerankService.rerank(question, results);
+            if (results == null || results.isEmpty()) {
+                lastCitations.set(Collections.emptyList());
+                return "";
+            }
+
+            // 3. 过滤低相关度
+            List<Map<String, Object>> citations = results.stream()
+                    .filter(r -> (double) r.getOrDefault("score", 0.0) > 0.3)
+                    .toList();
+            lastCitations.set(citations);
+
+            if (citations.isEmpty()) return "";
+
+            // 构建纯参考上下文（不带引用格式指令）
+            StringBuilder ctx = new StringBuilder();
+            ctx.append("【参考知识库内容】\n");
+            for (int i = 0; i < citations.size(); i++) {
+                var c = citations.get(i);
+                ctx.append("[").append(i + 1).append("] ")
+                        .append("《").append(c.get("docTitle")).append("》")
+                        .append(": ").append(c.get("content")).append("\n");
+            }
+            return ctx.toString();
         } catch (Exception e) {
-            log.warn("RAG 检索失败（不影响主流程）: {}", e.getMessage());
+            log.warn("RAG 检索/Rerank 失败（不影响主流程）: {}", e.getMessage());
+            lastCitations.set(Collections.emptyList());
             return "";
         }
+    }
+
+    /**
+     * 获取最近一次 RAG 检索的引用来源
+     */
+    public List<Map<String, Object>> getLastCitations() {
+        var c = lastCitations.get();
+        return c != null ? c : Collections.emptyList();
     }
 
     // ==================== 限流 ====================

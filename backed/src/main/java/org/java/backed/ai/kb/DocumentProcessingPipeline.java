@@ -2,14 +2,15 @@ package org.java.backed.ai.kb;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.java.backed.ai.kb.chunk.ChunkOptions;
+import org.java.backed.ai.kb.chunk.ChunkResult;
+import org.java.backed.ai.kb.chunk.FixedSizeChunkingStrategy;
 import org.java.backed.entity.KbChunk;
 import org.java.backed.entity.KbDocument;
 import org.java.backed.mapper.KbChunkMapper;
 import org.java.backed.mapper.KbDocumentMapper;
 import org.java.backed.service.MinioService;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,18 +28,18 @@ public class DocumentProcessingPipeline {
 
     private final MinioService minioService;
     private final DocumentParserService parserService;
-    private final TextChunkingService chunkingService;
+    private final ChunkQualityEvaluator qualityEvaluator;
     private final EmbeddingService embeddingService;
     private final MilvusVectorStoreService milvusService;
     private final KbDocumentMapper documentMapper;
     private final KbChunkMapper chunkMapper;
 
     /**
-     * 异步处理文档（上传完成后调用）
+     * 处理文档（由 RabbitMQ 消费者调用）
+     * 注意：不加 @Transactional，因为每步可能耗时较长，
+     * 且异常时需要保留 FAILED 状态不被回滚
      */
-    @Async
-    @Transactional
-    public void processAsync(Long documentId) {
+    public void process(Long documentId) {
         KbDocument doc = documentMapper.selectById(documentId);
         if (doc == null) {
             log.warn("文档不存在: id={}", documentId);
@@ -46,38 +47,44 @@ public class DocumentProcessingPipeline {
         }
 
         try {
-            // 1. 更新状态为处理中
-            doc.setStatus("PROCESSING");
-            documentMapper.updateById(doc);
+            log.info("=== 开始处理文档 [id={}, file={}] ===", documentId, doc.getFileName());
 
-            // 2. 从 MinIO 下载文件
-            log.info("开始处理文档: id={}, fileName={}", documentId, doc.getFileName());
+            // 1. PROCESSING
+            KbDocument update = new KbDocument();
+            update.setId(doc.getId());
+            update.setStatus("PROCESSING");
+            documentMapper.updateById(update);
+            log.info("[1/6] 状态→PROCESSING ✓");
+
+            // 2. MinIO 下载
+            log.info("[2/6] MinIO 下载: {}", doc.getFileUrl());
             byte[] content = minioService.download(doc.getFileUrl());
-            if (content == null || content.length == 0) {
-                throw new RuntimeException("文件内容为空");
-            }
+            log.info("[2/6] MinIO 下载完成: {} bytes", content.length);
 
-            // 3. 解析文本
+            // 3. 解析
+            log.info("[3/6] Tika 解析...");
             String text = parserService.parse(content, doc.getFileName());
-            if (text.trim().isEmpty()) {
-                throw new RuntimeException("文档解析后无有效文本");
-            }
+            log.info("[3/6] 解析完成: {} 字符", text.length());
 
-            // 4. 分块
-            List<TextChunkingService.ChunkResult> chunkResults = chunkingService.chunk(text);
-            if (chunkResults.isEmpty()) {
-                throw new RuntimeException("文档分块为空");
-            }
+            // 4. 分块（暂时全部用 FixedSize，Markdown 策略有递归 bug）
+            var strategy = new org.java.backed.ai.kb.chunk.FixedSizeChunkingStrategy();
+            log.info("[4/6] 分块策略: {}", strategy.name());
+            ChunkOptions chunkOpts = ChunkOptions.builder()
+                    .chunkSize(512).overlapSize(128).build();
+            List<ChunkResult> chunkResults = strategy.chunk(text, chunkOpts);
+            log.info("[4/6] 原始分块: {} 个", chunkResults.size());
+
+            chunkResults = qualityEvaluator.evaluate(chunkResults);
+            log.info("[4/6] 质量过滤后: {} 个", chunkResults.size());
 
             // 5. 向量化
             List<String> chunkTexts = chunkResults.stream()
-                    .map(TextChunkingService.ChunkResult::getContent)
+                    .map(ChunkResult::getContent)
                     .collect(Collectors.toList());
+            log.info("[5/6] Embedding 开始: {} 个文本...", chunkTexts.size());
             List<float[]> vectors = embeddingService.embedBatch(chunkTexts);
-
-            if (vectors.size() != chunkResults.size()) {
-                throw new RuntimeException("向量数量与分块数量不匹配");
-            }
+            log.info("[5/6] Embedding 完成: {} 个向量, dim={}",
+                    vectors.size(), vectors.isEmpty() ? "?" : vectors.get(0).length);
 
             // 6. 存储分块元数据到 MySQL
             List<KbChunk> chunks = new ArrayList<>();
@@ -92,8 +99,10 @@ public class DocumentProcessingPipeline {
             for (KbChunk chunk : chunks) {
                 chunkMapper.insert(chunk);
             }
+            log.info("[6/6] MySQL 存储完成: {} 条 chunks", chunks.size());
 
             // 7. 存储向量到 Milvus
+            log.info("[7/6] Milvus 存储开始...");
             List<MilvusVectorStoreService.ChunkVector> milvusChunks = new ArrayList<>();
             for (int i = 0; i < chunkResults.size(); i++) {
                 milvusChunks.add(new MilvusVectorStoreService.ChunkVector(
@@ -104,19 +113,23 @@ public class DocumentProcessingPipeline {
                 ));
             }
             milvusService.insert(milvusChunks);
+            log.info("[7/6] Milvus 存储完成");
 
-            // 8. 更新文档状态为完成
-            doc.setStatus("COMPLETED");
-            doc.setChunkCount(chunks.size());
-            documentMapper.updateById(doc);
-
-            log.info("文档处理完成: id={}, 分块数={}", documentId, chunks.size());
+            // 8. COMPLETED
+            KbDocument done = new KbDocument();
+            done.setId(documentId);
+            done.setStatus("COMPLETED");
+            done.setChunkCount(chunks.size());
+            documentMapper.updateById(done);
+            log.info("=== 文档处理完成: id={}, 分块={} ===", documentId, chunks.size());
 
         } catch (Exception e) {
             log.error("文档处理失败: id={}", documentId, e);
-            doc.setStatus("FAILED");
-            doc.setErrorMsg(e.getMessage());
-            documentMapper.updateById(doc);
+            KbDocument failUpdate = new KbDocument();
+            failUpdate.setId(doc.getId());
+            failUpdate.setStatus("FAILED");
+            failUpdate.setErrorMsg(e.getClass().getSimpleName() + ": " + e.getMessage());
+            documentMapper.updateById(failUpdate);
         }
     }
 

@@ -27,9 +27,11 @@ public class UserController {
     public Result<PageResult<SysUser>> list(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize,
-            @RequestParam(required = false) String username) {
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String role) {
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(username != null, SysUser::getUsername, username);
+        wrapper.eq(role != null, SysUser::getRole, role);
         wrapper.orderByDesc(SysUser::getCreateTime);
         Page<SysUser> result = userMapper.selectPage(new Page<>(page, pageSize), wrapper);
         result.getRecords().forEach(u -> u.setPassword(null));

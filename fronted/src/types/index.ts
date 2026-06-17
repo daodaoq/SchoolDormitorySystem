@@ -122,6 +122,15 @@ export interface LoginResult {
   roleName: string;
   permissions: string[];
   menus: MenuItem[];
+  studentInfo?: {
+    id: number;
+    studentNo: string;
+    studentName: string;
+    dormitoryNo: string;
+    phone: string;
+    checkInDate: string;
+    paymentStatus: string;
+  };
 }
 
 export interface RoleItem {

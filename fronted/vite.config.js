@@ -20,6 +20,17 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
+        // SSE 流式响应需要禁用缓冲
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            // 对 SSE 端点禁用缓冲
+            if (req.url?.includes('/ask/stream')) {
+              res.setHeader('Cache-Control', 'no-cache');
+              res.setHeader('X-Accel-Buffering', 'no');
+              res.flushHeaders();
+            }
+          });
+        },
       },
     },
   },

@@ -2,12 +2,14 @@ package org.java.backed.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
+import org.java.backed.config.CacheConfig;
 import org.java.backed.entity.SysMenu;
 import org.java.backed.entity.SysRoleMenu;
 import org.java.backed.mapper.SysMenuMapper;
 import org.java.backed.mapper.SysRoleMenuMapper;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,14 +28,16 @@ public class MenuService extends ServiceImpl<SysMenuMapper, SysMenu> {
         return buildTree(all, 0L);
     }
 
-    /** 获取全部菜单(树形) */
+    /** 获取全部菜单(树形) — 缓存 30 分钟（菜单很少变动） */
+    @Cacheable(cacheNames = CacheConfig.CACHE_MENUS, key = "'all'")
     public List<SysMenu> getAllMenuTree() {
         List<SysMenu> all = list(new LambdaQueryWrapper<SysMenu>().orderByAsc(SysMenu::getSortOrder));
         return buildTree(all, 0L);
     }
 
-    /** 分配权限 */
+    /** 分配权限 — 清除菜单缓存 */
     @Transactional
+    @CacheEvict(cacheNames = CacheConfig.CACHE_MENUS, allEntries = true)
     public void assignPermissions(Long roleId, List<Long> menuIds) {
         roleMenuMapper.delete(new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, roleId));
         if (menuIds != null && !menuIds.isEmpty()) {

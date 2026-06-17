@@ -16,6 +16,7 @@ import Users from './pages/Users';
 import Roles from './pages/Roles';
 import Dormitory from './pages/Dormitory';
 import Menus from './pages/Menus';
+import Personnel from './pages/Personnel';
 import MyDormitory from './pages/MyDormitory';
 import MyBills from './pages/MyBills';
 import Profile from './pages/Profile';
@@ -77,6 +78,7 @@ function AppRoutes() {
         <Route path="users" element={<Users />} />
         <Route path="roles" element={<Roles />} />
         <Route path="menus" element={<Menus />} />
+        <Route path="personnel" element={<Personnel />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

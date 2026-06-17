@@ -110,7 +110,7 @@ public class MilvusVectorStoreService {
             FieldType embeddingField = FieldType.newBuilder()
                     .withName(FIELD_EMBEDDING)
                     .withDataType(DataType.FloatVector)
-                    .withDimension(1536)  // DeepSeek embedding 维度
+                    .withDimension(1536)  // text-embedding-v2 实际维度
                     .build();
 
             CreateCollectionParam createParam = CreateCollectionParam.newBuilder()
@@ -195,6 +195,7 @@ public class MilvusVectorStoreService {
 
         SearchParam searchParam = SearchParam.newBuilder()
                 .withCollectionName(COLLECTION_NAME)
+                .withVectorFieldName(FIELD_EMBEDDING)
                 .withMetricType(MetricType.COSINE)
                 .withOutFields(outFields)
                 .withTopK(topK)

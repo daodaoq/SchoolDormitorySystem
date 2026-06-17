@@ -3,9 +3,11 @@ package org.java.backed.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import org.java.backed.common.Result;
+import org.java.backed.entity.StudentDormitory;
 import org.java.backed.entity.SysMenu;
 import org.java.backed.entity.SysRole;
 import org.java.backed.entity.SysUser;
+import org.java.backed.mapper.StudentDormitoryMapper;
 import org.java.backed.mapper.SysRoleMapper;
 import org.java.backed.mapper.SysUserMapper;
 import org.java.backed.service.MenuService;
@@ -27,6 +29,7 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final MenuService menuService;
+    private final StudentDormitoryMapper studentDormitoryMapper;
 
     @PostMapping("/login")
     public Result<?> login(@RequestBody Map<String, String> params) {
@@ -56,15 +59,33 @@ public class AuthController {
 
         String token = jwtUtil.generateToken(user.getUsername(), user.getRole(), permissions);
 
-        return Result.ok(Map.of(
-                "token", token,
-                "username", user.getUsername(),
-                "realName", user.getRealName(),
-                "role", user.getRole(),
-                "roleName", role != null ? role.getRoleName() : "",
-                "permissions", permissions,
-                "menus", menuTree
-        ));
+        Map<String, Object> resultMap = new java.util.LinkedHashMap<>();
+        resultMap.put("token", token);
+        resultMap.put("username", user.getUsername());
+        resultMap.put("realName", user.getRealName());
+        resultMap.put("role", user.getRole());
+        resultMap.put("roleName", role != null ? role.getRoleName() : "");
+        resultMap.put("permissions", permissions);
+        resultMap.put("menus", menuTree);
+
+        // 如果是学生，附带其宿舍信息
+        if ("STUDENT".equals(user.getRole())) {
+            StudentDormitory studentRecord = studentDormitoryMapper.selectOne(
+                    new LambdaQueryWrapper<StudentDormitory>().eq(StudentDormitory::getUserId, user.getId()));
+            if (studentRecord != null) {
+                resultMap.put("studentInfo", Map.of(
+                        "id", studentRecord.getId(),
+                        "studentNo", studentRecord.getStudentNo(),
+                        "studentName", studentRecord.getStudentName(),
+                        "dormitoryNo", studentRecord.getDormitoryNo(),
+                        "phone", studentRecord.getPhone() != null ? studentRecord.getPhone() : "",
+                        "checkInDate", studentRecord.getCheckInDate() != null ? studentRecord.getCheckInDate().toString() : "",
+                        "paymentStatus", studentRecord.getPaymentStatus()
+                ));
+            }
+        }
+
+        return Result.ok(resultMap);
     }
 
     @GetMapping("/me")

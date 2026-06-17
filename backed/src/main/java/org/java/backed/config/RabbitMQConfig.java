@@ -15,18 +15,21 @@ public class RabbitMQConfig {
     public static final String EXCHANGE_PAYMENT = "payment.exchange";
     public static final String EXCHANGE_NOTIFICATION = "notification.exchange";
     public static final String EXCHANGE_EXCEL = "excel.exchange";
+    public static final String EXCHANGE_KB_DOCUMENT = "kb.document.exchange";
 
     // ========== 队列 ==========
     public static final String QUEUE_BILL_GENERATE = "bill.generate.queue";
     public static final String QUEUE_PAYMENT_CALLBACK = "payment.callback.queue";
     public static final String QUEUE_NOTIFICATION_SEND = "notification.send.queue";
     public static final String QUEUE_EXCEL_EXPORT = "excel.export.queue";
+    public static final String QUEUE_KB_DOCUMENT_PROCESS = "kb.document.process.queue";
 
     // ========== 路由键 ==========
     public static final String RK_BILL_GENERATE = "bill.generate";
     public static final String RK_PAYMENT_CALLBACK = "payment.callback";
     public static final String RK_NOTIFICATION_SEND = "notification.send";
     public static final String RK_EXCEL_EXPORT = "excel.export";
+    public static final String RK_KB_DOCUMENT_PROCESS = "kb.document.process";
 
     // ========== 交换机定义 ==========
     @Bean
@@ -47,6 +50,11 @@ public class RabbitMQConfig {
     @Bean
     public DirectExchange excelExchange() {
         return new DirectExchange(EXCHANGE_EXCEL);
+    }
+
+    @Bean
+    public DirectExchange kbDocumentExchange() {
+        return new DirectExchange(EXCHANGE_KB_DOCUMENT);
     }
 
     // ========== 队列定义 ==========
@@ -70,6 +78,11 @@ public class RabbitMQConfig {
         return QueueBuilder.durable(QUEUE_EXCEL_EXPORT).build();
     }
 
+    @Bean
+    public Queue kbDocumentProcessQueue() {
+        return QueueBuilder.durable(QUEUE_KB_DOCUMENT_PROCESS).build();
+    }
+
     // ========== 绑定关系 ==========
     @Bean
     public Binding bindBillGenerate() {
@@ -89,5 +102,10 @@ public class RabbitMQConfig {
     @Bean
     public Binding bindExcelExport() {
         return BindingBuilder.bind(excelExportQueue()).to(excelExchange()).with(RK_EXCEL_EXPORT);
+    }
+
+    @Bean
+    public Binding bindKbDocumentProcess() {
+        return BindingBuilder.bind(kbDocumentProcessQueue()).to(kbDocumentExchange()).with(RK_KB_DOCUMENT_PROCESS);
     }
 }

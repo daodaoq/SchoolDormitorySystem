@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, Row, Col, Descriptions, Tag, Statistic, Spin, Empty, Progress } from 'antd';
 import { HomeOutlined, PhoneOutlined, CalendarOutlined, CheckCircleOutlined, WarningOutlined } from '@ant-design/icons';
 import { useAuth } from '../../contexts/AuthContext';
-import { getOverview } from '../../services/api';
+import { getOverview, getStudentOverview } from '../../services/api';
 import type { DashboardOverview } from '../../types';
 
 const MyDormitory: React.FC = () => {
@@ -13,11 +13,23 @@ const MyDormitory: React.FC = () => {
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
-    try { const res = await getOverview(); setOverview(res.data); } catch { /* */ }
+    try {
+      const studentInfo = user?.studentInfo;
+      // 学生端：获取个人缴费概览；管理员端：获取全局概览
+      if (studentInfo?.id) {
+        const res = await getStudentOverview(studentInfo.id);
+        setOverview(res.data);
+      } else {
+        const res = await getOverview();
+        setOverview(res.data);
+      }
+    } catch { /* */ }
     setLoading(false);
   };
 
   if (loading) return <Spin size="large" style={{ display: 'block', margin: '120px auto' }} />;
+
+  const studentInfo = user?.studentInfo;
 
   return (
     <div style={{ padding: 24 }}>
@@ -47,13 +59,15 @@ const MyDormitory: React.FC = () => {
             style={{ borderRadius: 24, border: '1px solid rgba(26,26,26,0.10)', boxShadow: '3px 3px 0 rgba(26,26,26,0.05)' }}
           >
             <Descriptions column={1} size="middle">
-              <Descriptions.Item label="姓名">{user?.realName || '—'}</Descriptions.Item>
-              <Descriptions.Item label="学号">{user?.username || '—'}</Descriptions.Item>
+              <Descriptions.Item label="姓名">{studentInfo?.studentName || user?.realName || '—'}</Descriptions.Item>
+              <Descriptions.Item label="学号">{studentInfo?.studentNo || '—'}</Descriptions.Item>
               <Descriptions.Item label="宿舍号">
-                <Tag color="#E85D4E" style={{ fontSize: 16, padding: '4px 16px', borderRadius: 9999 }}>A-101</Tag>
+                <Tag color="#E85D4E" style={{ fontSize: 16, padding: '4px 16px', borderRadius: 9999 }}>
+                  {studentInfo?.dormitoryNo || '未分配'}
+                </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label={<><PhoneOutlined /> 联系方式</>}>138****8001</Descriptions.Item>
-              <Descriptions.Item label={<><CalendarOutlined /> 入住时间</>}>2024-09-01</Descriptions.Item>
+              <Descriptions.Item label={<><PhoneOutlined /> 联系方式</>}>{studentInfo?.phone || '—'}</Descriptions.Item>
+              <Descriptions.Item label={<><CalendarOutlined /> 入住时间</>}>{studentInfo?.checkInDate || '—'}</Descriptions.Item>
             </Descriptions>
           </Card>
         </Col>
@@ -71,7 +85,7 @@ const MyDormitory: React.FC = () => {
                     <Progress type="dashboard" percent={Math.round(overview.collectionRate || 0)}
                       strokeColor={{ '0%': '#E85D4E', '100%': '#C4D94E' }} size={140}
                       format={(p) => <span style={{ fontSize: 28, fontWeight: 700, color: '#1A1A1A', fontFamily: "'Bodoni Moda', serif" }}>{p}%</span>} />
-                    <p style={{ marginTop: 4, color: 'rgba(26,26,26,0.35)', fontSize: 13 }}>整体缴费进度</p>
+                    <p style={{ marginTop: 4, color: 'rgba(26,26,26,0.35)', fontSize: 13 }}>{studentInfo ? '我的缴费进度' : '整体缴费进度'}</p>
                   </div>
                 </Col>
                 <Col span={12}>
