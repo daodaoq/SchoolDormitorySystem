@@ -67,7 +67,7 @@ const Login: React.FC = () => {
           position: 'relative',
           zIndex: 1,
         }}
-        bodyStyle={{ padding: '56px 48px' }}
+        styles={{ body: { padding: '56px 48px' } }}
       >
         {/* 标题区 */}
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
@@ -129,7 +129,7 @@ const Login: React.FC = () => {
           fontFamily: "'Space Grotesk', sans-serif",
           letterSpacing: '0.05em',
         }}>
-          默认账号: admin / admin123
+          默认账号: admin / 123456
         </Text>
       </Card>
     </div>

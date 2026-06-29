@@ -15,6 +15,7 @@ import KnowledgeBase from './pages/KnowledgeBase';
 import Users from './pages/Users';
 import Roles from './pages/Roles';
 import Dormitory from './pages/Dormitory';
+import Logs from './pages/Logs';
 
 import MyDormitory from './pages/MyDormitory';
 import MyBills from './pages/MyBills';
@@ -88,6 +89,7 @@ function AppRoutes() {
         <Route path="dormitories" element={<RequireRole roles={['ADMIN', 'TEACHER']}><Dormitory /></RequireRole>} />
         <Route path="users" element={<RequireRole roles={['ADMIN', 'TEACHER']}><Users /></RequireRole>} />
         <Route path="roles" element={<RequireRole roles={['ADMIN', 'TEACHER']}><Roles /></RequireRole>} />
+        <Route path="logs" element={<RequireRole roles={['ADMIN', 'TEACHER']}><Logs /></RequireRole>} />
 
         {/* 所有角色可访问 */}
         <Route path="profile" element={<Profile />} />

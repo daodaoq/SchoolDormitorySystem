@@ -1,108 +1,90 @@
-# 学生宿舍收费管理系统
+# 智慧宿舍收费管理系统
 
-基于 SpringBoot 3.2 + React 18 的全栈高并发宿舍收费管理系统。
+基于 Spring Boot + React + AI 的全栈宿舍收费管理系统，支持账单管理、支付宝缴费、知识库智能问答。
 
 ## 技术栈
 
 | 层级 | 技术 |
 |------|------|
-| **后端** | Spring Boot 3.2.5, MyBatis-Plus 3.5.6, Redis, RabbitMQ, Spring AI |
-| **前端** | React 18, Ant Design 5, ECharts, Vite |
-| **数据库** | MySQL 8.0 |
-| **工具** | Apache POI (Excel), JavaMail, Alipay SDK (Stub), Lombok, Hutool |
+| 后端 | Spring Boot 3.2.5、MyBatis-Plus 3.5.6、Spring Security + JWT |
+| 数据库 | MySQL 8.0 |
+| 缓存 | Redis 7 |
+| 消息队列 | RabbitMQ 3.13 |
+| 对象存储 | MinIO |
+| 向量数据库 | Milvus 2.4 |
+| 前端 | React 19、TypeScript、Vite 8 |
+| UI | Ant Design 5、Tailwind CSS 4 |
+| 图表 | ECharts |
+| 支付 | 支付宝沙箱 |
+| AI | SSE 流式输出、知识库 RAG |
 
-## 项目结构
+## 功能模块
 
-```
-SchoolDormitorySystem/
-├── backed/                          # 后端 Spring Boot 项目
-│   ├── src/main/java/org/java/backed/
-│   │   ├── BackedApplication.java   # 启动类
-│   │   ├── common/                  # 通用工具 (Result, RedisLock, SnowflakeID...)
-│   │   ├── config/                  # 配置类 (Redis, RabbitMQ, Alipay, CORS...)
-│   │   ├── entity/                  # 实体类 (7张表)
-│   │   ├── mapper/                  # MyBatis-Plus Mapper
-│   │   ├── service/                 # 业务服务层
-│   │   ├── controller/              # REST API 控制器
-│   │   ├── consumer/                # RabbitMQ 消费者
-│   │   ├── task/                    # 定时任务
-│   │   └── util/                    # 工具类 (Excel, Email, Alipay)
-│   ├── src/main/resources/
-│   │   ├── application.yaml         # 主配置文件
-│   │   └── db/schema.sql            # 数据库初始化脚本
-│   └── pom.xml                      # Maven 依赖
-├── fronted/                         # 前端 React 项目
-│   └── src/
-│       ├── layouts/BasicLayout.jsx  # 主布局 (侧边栏+顶栏)
-│       ├── pages/
-│       │   ├── Dashboard/           # 首页仪表盘 (ECharts图表)
-│       │   ├── Student/             # 学生管理 (CRUD+Excel导入导出)
-│       │   ├── FeeItem/             # 收费项目管理
-│       │   ├── Bill/                # 账单管理 (生成+导出)
-│       │   ├── Payment/             # 在线缴费 (支付宝沙箱)
-│       │   ├── Statistics/          # 统计报表
-│       │   └── AiQa/                # AI智能问答
-│       ├── services/api.js          # API 请求封装
-│       └── utils/request.js         # Axios 拦截器
-├── API接口文档.md                   # 完整 REST API 文档
-├── 数据库设计文档.md                 # 数据库表结构设计
-└── 设计要求.txt                     # 原始设计文档
-```
+### 后台管理（管理员/教师）
 
-## 6大核心模块
+| 模块 | 功能 |
+|------|------|
+| 数据概览 | 仪表盘统计卡片、收缴率环形图、收费类型分布饼图 |
+| 学生管理 | 学生 CRUD、照片上传、批量导入导出 Excel、模糊搜索 |
+| 宿舍管理 | 宿舍楼栋楼层 CRUD |
+| 收费项目 | 收费项目 CRUD、自定义收费类型、模糊搜索 |
+| 账单管理 | 单条新建、批量生成、状态修正、Excel 导出 |
+| 支付管理 | 支付记录查询、学号筛选 |
+| 统计报表 | 各类型收缴率柱状图、欠费明细表、动态学期筛选 |
+| 用户管理 | 系统用户 CRUD、角色筛选、头像上传 |
+| 角色管理 | 角色 CRUD、菜单权限分配 |
+| AI 问答 | 流式输出、知识库检索、文档溯源、多轮对话 |
+| 知识库 | 文档上传、自动分块向量化、语义搜索 |
 
-1. **学生宿舍信息管理** - 录入、查询、Excel批量导入导出
-2. **宿舍收费项目管理** - 收费类型配置、分布式锁防并发修改
-3. **缴费记录管理** - 自动账单生成、状态管理、异步导出
-4. **在线缴费** - 支付宝沙箱集成、防重复支付、幂等回调
-5. **收费统计与报表** - 多维统计、ECharts可视化、逾期预警通知
-6. **SpringAI智能问答** - 本地知识库匹配、缓存、限流、降级
+### 学生端
 
-## 高并发特性
+| 模块 | 功能 |
+|------|------|
+| 我的宿舍 | 宿舍信息、个人缴费进度 |
+| 我的账单 | 待缴账单、支付宝支付、确认缴费、支付记录 |
+| AI 助手 | 基于知识库的智能问答 |
+| 个人信息 | 账户信息查看 |
 
-- Redis缓存热点数据（收费配置、学生信息等）
-- RabbitMQ异步解耦（账单生成、通知发送、支付回调）
-- Redis分布式锁防并发支付、重复账单
-- 接口速率限制（AI问答、支付接口）
-- 数据库索引优化（学号、宿舍号、账单状态、支付时间）
-- 定时任务（逾期检查、订单超时关闭、统计预计算）
+## 快速启动
 
-## 快速开始
+### 环境要求
 
-### 前置要求
-
-- Java 17+
-- MySQL 8.0+
+- JDK 17+
 - Node.js 18+
-- (可选) Redis, RabbitMQ
+- Docker Desktop
+- MySQL 8.0
 
-### 1. 初始化数据库
+### 1. 启动中间件
 
 ```bash
-# 修改 application.yaml 中的数据库密码
-# 然后执行:
+docker-compose up -d
+```
+
+启动 Redis、RabbitMQ、MinIO、Milvus。
+
+### 2. 初始化数据库
+
+```bash
+# 一键导入（含建表 + 种子数据 + 1000 测试学生 + 10000 账单）
 mysql -u root -p < backed/src/main/resources/db/schema.sql
 ```
 
-### 2. 配置 application.yaml
+数据库完全由 SQL 脚本管理，启动后端**不会**自动修改数据库。
 
-编辑 `backed/src/main/resources/application.yaml`:
-- MySQL 连接密码
-- Redis 连接 (如未安装可注释)
-- RabbitMQ 连接 (如未安装可注释)
-- 支付宝沙箱配置 (使用Stub实现，无需配置即可运行)
-- OpenAI API Key (AI问答功能需要)
+### 3. 配置后端
 
-### 3. 启动后端
+复制 `backed/src/main/resources/application-example.yaml` 为 `application.yaml`，修改数据库密码等配置。
+
+### 4. 启动后端
 
 ```bash
 cd backed
-./mvnw spring-boot:run
+mvn spring-boot:run
 ```
 
-后端启动在 http://localhost:8080
+后端运行在 `http://localhost:8080`。
 
-### 4. 启动前端
+### 5. 启动前端
 
 ```bash
 cd fronted
@@ -110,43 +92,48 @@ npm install
 npm run dev
 ```
 
-前端启动在 http://localhost:3000，自动代理API到后端
+前端运行在 `http://localhost:3001`。
 
-### 5. 访问系统
+### 6. 登录
 
-打开 http://localhost:3000 即可访问完整系统。
+| 角色 | 用户名 | 密码 |
+|------|--------|------|
+| 管理员 | admin | 123456 |
+| 教师 | teacher | 123456 |
+| 学生 | student | 123456 |
 
-## 数据库表
+## 项目结构
 
-| 表名 | 说明 |
-|------|------|
-| student_dormitory | 学生宿舍信息表 |
-| fee_item | 收费项目表 |
-| payment_bill | 缴费账单表 |
-| payment_record | 支付流水表 |
-| notification_record | 通知记录表 |
-| ai_qa_log | AI问答日志表 |
-| operation_log | 操作日志表 |
-
-## 编译验证
-
-```bash
-# 后端编译 (已验证 BUILD SUCCESS)
-cd backed && ./mvnw compile
-
-# 前端编译 (已验证)
-cd fronted && npm run build
+```
+SchoolDormitorySystem/
+├── backed/                          # Spring Boot 后端
+│   └── src/main/java/org/java/backed/
+│       ├── ai/                      # AI 问答（SSE流式、知识库RAG）
+│       ├── common/                  # 公共类（Result、雪花ID、分布式锁）
+│       ├── config/                  # Spring 配置（Cache、Security、MinIO）
+│       ├── consumer/                # RabbitMQ 消费者
+│       ├── controller/              # REST 控制器
+│       ├── entity/                  # 实体类
+│       ├── mapper/                  # MyBatis 映射器
+│       ├── security/                # JWT 认证 + 角色鉴权
+│       ├── service/                 # 业务逻辑
+│       └── util/                    # 工具（Excel、Email、JWT）
+├── fronted/                         # React 前端
+│   └── src/
+│       ├── components/              # 公共组件（DocumentViewer等）
+│       ├── layouts/                 # 布局（BasicLayout、StudentLayout）
+│       ├── pages/                   # 页面组件（16个页面）
+│       ├── services/                # API 调用
+│       ├── stores/                  # Zustand 状态管理
+│       ├── types/                   # TypeScript 类型定义
+│       └── utils/                   # Axios 封装
+├── docs/                            # 文档
+│   ├── API.md                       # 接口文档
+│   └── DATABASE.md                  # 数据库设计文档
+└── docker-compose.yml
 ```
 
-## 注意事项
+## 文档
 
-1. **支付宝SDK**: 当前使用Stub实现（模拟支付）。集成真实支付宝需要：
-   - 下载 alipay-sdk-java 并安装到本地Maven仓库
-   - 配置真实的沙箱APPID/密钥
-   - 替换 `AlipayUtil.java` 中的 Stub 实现
-
-2. **Spring AI**: 需要配置有效的 OpenAI API Key，否则使用本地知识库+降级回复
-
-3. **Redis/RabbitMQ**: 系统设计支持，但基础CRUD功能不依赖这两个中间件
-
-4. **邮件通知**: 需要配置真实的SMTP服务器参数
+- [接口文档](docs/API.md) — 全部 REST API 接口说明
+- [数据库设计文档](docs/DATABASE.md) — 表结构 DDL 与种子数据

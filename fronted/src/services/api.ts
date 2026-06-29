@@ -71,6 +71,9 @@ export const exportBills = (params: Record<string, any>) =>
 export const createPaymentOrder = (billId: number) =>
   request.post<any, ApiResult>('/payment/create-order', { billId });
 
+export const directPay = (billId: number) =>
+  request.post<any, ApiResult>(`/bills/${billId}/pay`);
+
 export const getPaymentRecords = (params: Record<string, any>) =>
   request.get<any, ApiResult<PageResult<any>>>('/payment/records', { params });
 
@@ -309,6 +312,10 @@ export const reprocessKbDocument = (id: number) =>
 
 export const searchKnowledgeBase = (query: string, topK = 5) =>
   request.post<any, ApiResult>('/kb/search', { query, topK });
+
+// ===== 操作日志 =====
+export const getLogs = (params: Record<string, any>) =>
+  request.get<any, ApiResult<PageResult<any>>>('/logs', { params });
 
 // ===== 人员管理 =====
 export const getStudentPersonnel = (params: Record<string, any>) =>

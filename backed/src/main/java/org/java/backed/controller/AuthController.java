@@ -3,6 +3,7 @@ package org.java.backed.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import org.java.backed.common.Result;
+import org.java.backed.common.annotation.OpLog;
 import org.java.backed.entity.StudentDormitory;
 import org.java.backed.entity.SysMenu;
 import org.java.backed.entity.SysRole;
@@ -34,16 +35,22 @@ public class AuthController {
     private final StudentDormitoryMapper studentDormitoryMapper;
     private final StringRedisTemplate stringRedisTemplate;
 
-    /** 登录限流：同一IP每分钟最多10次尝试 */
+    /** 登录限流：同一IP每分钟最多10次尝试。Redis不可用时自动跳过限流 */
     private boolean checkRateLimit(String key) {
-        String redisKey = "rate_limit:login:" + key;
-        Long count = stringRedisTemplate.opsForValue().increment(redisKey);
-        if (count != null && count == 1) {
-            stringRedisTemplate.expire(redisKey, 1, TimeUnit.MINUTES);
+        try {
+            String redisKey = "rate_limit:login:" + key;
+            Long count = stringRedisTemplate.opsForValue().increment(redisKey);
+            if (count != null && count == 1) {
+                stringRedisTemplate.expire(redisKey, 1, TimeUnit.MINUTES);
+            }
+            return count != null && count <= 10;
+        } catch (Exception e) {
+            // Redis 不可用 → 跳过限流，允许登录
+            return true;
         }
-        return count != null && count <= 10;
     }
 
+    @OpLog(module = "认证", action = "登录", description = "用户登录", logParams = false)
     @PostMapping("/login")
     public Result<?> login(@RequestBody Map<String, String> params,
                            @RequestHeader(value = "X-Forwarded-For", required = false) String forwardedFor,

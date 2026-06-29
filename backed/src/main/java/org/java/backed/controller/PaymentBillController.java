@@ -4,13 +4,19 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.java.backed.common.PageResult;
 import org.java.backed.common.Result;
 import org.java.backed.common.SnowflakeIdGenerator;
+import org.java.backed.common.annotation.OpLog;
 import org.java.backed.entity.PaymentBill;
+import org.java.backed.entity.PaymentRecord;
+import org.java.backed.mapper.PaymentRecordMapper;
 import org.java.backed.service.PaymentBillService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -27,6 +33,9 @@ public class PaymentBillController {
 
     @Autowired
     private SnowflakeIdGenerator idGenerator;
+
+    @Autowired
+    private PaymentRecordMapper paymentRecordMapper;
 
     /**
      * 分页查询账单
@@ -56,6 +65,7 @@ public class PaymentBillController {
     /**
      * 新建单条账单
      */
+    @OpLog(module = "账单管理", action = "新增", description = "新建单条账单")
     @PostMapping
     public Result<PaymentBill> createBill(@RequestBody PaymentBill bill) {
         if (bill.getStudentId() == null) return Result.badRequest("请选择学生");
@@ -87,11 +97,42 @@ public class PaymentBillController {
     /**
      * 管理员修正账单状态
      */
+    @OpLog(module = "账单管理", action = "修改", description = "修正账单状态")
     @PutMapping("/{id}/status")
     public Result<Void> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> params) {
         String status = params.get("status");
         String remark = params.get("remark");
         billService.updateBillStatus(id, status, remark);
+        return Result.ok();
+    }
+
+    /**
+     * 直接确认缴费（跳过支付宝，用于测试演示）
+     */
+    @OpLog(module = "账单管理", action = "支付", description = "确认缴费")
+    @PostMapping("/{id}/pay")
+    public Result<Void> directPay(@PathVariable Long id) {
+        PaymentBill bill = billService.getById(id);
+        if (bill == null) return Result.notFound("账单不存在");
+        if ("PAID".equals(bill.getStatus())) return Result.fail("该账单已缴费");
+
+        // 创建支付记录
+        PaymentRecord record = new PaymentRecord();
+        record.setBillId(id);
+        record.setStudentId(bill.getStudentId());
+        record.setOrderNo(idGenerator.generateOrderNo());
+        record.setAmount(bill.getAmount().subtract(bill.getPaidAmount()));
+        record.setPayMethod("SYSTEM");
+        record.setTradeNo("DIRECT_" + System.currentTimeMillis());
+        record.setPayTime(LocalDateTime.now());
+        record.setStatus("SUCCESS");
+        paymentRecordMapper.insert(record);
+
+        // 更新账单
+        bill.setPaidAmount(bill.getAmount());
+        bill.setStatus("PAID");
+        billService.updateById(bill);
+
         return Result.ok();
     }
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Descriptions, Tag, Statistic, Spin, Empty, Progress } from 'antd';
+import { Card, Row, Col, Descriptions, Tag, Statistic, Spin, Empty, Progress, message } from 'antd';
 import { HomeOutlined, PhoneOutlined, CalendarOutlined, CheckCircleOutlined, WarningOutlined } from '@ant-design/icons';
 import { useAuthStore } from '../../stores/authStore';
 import { getOverview, getStudentOverview } from '../../services/api';
@@ -84,7 +84,7 @@ const MyDormitory: React.FC = () => {
                   <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
                     <Progress type="dashboard" percent={Math.round(overview.collectionRate || 0)}
                       strokeColor={{ '0%': '#E85D4E', '100%': '#C4D94E' }} size={140}
-                      format={(p) => <span style={{ fontSize: 28, fontWeight: 700, color: '#1A1A1A', fontFamily: "'Bodoni Moda', serif" }}>{p}%</span>} />
+                      format={(p) => <span style={{ fontSize: 28, fontWeight: 700, color: '#1A1A1A', fontFamily: 'var(--font-number)' }}>{p}%</span>} />
                     <p style={{ marginTop: 4, color: 'rgba(26,26,26,0.35)', fontSize: 13 }}>{studentInfo ? '我的缴费进度' : '整体缴费进度'}</p>
                   </div>
                 </Col>

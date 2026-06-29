@@ -174,7 +174,7 @@ const Dashboard: React.FC = () => {
             >
               <Card
                 style={{ borderRadius: 24, border: 'none', boxShadow: 'none' }}
-                bodyStyle={{ padding: '28px 24px' }}
+                styles={{ body: { padding: '28px 24px' } }}
               >
                 <Statistic
                   title={
@@ -223,7 +223,7 @@ const Dashboard: React.FC = () => {
             >
               <Card
                 style={{ borderRadius: 24, border: 'none', boxShadow: 'none' }}
-                bodyStyle={{ padding: '28px 24px' }}
+                styles={{ body: { padding: '28px 24px' } }}
               >
                 <Statistic
                   title={
@@ -264,7 +264,7 @@ const Dashboard: React.FC = () => {
               border: '1px solid rgba(26,26,26,0.10)',
               boxShadow: '3px 3px 0 rgba(26,26,26,0.05)',
             }}
-            bodyStyle={{ padding: 32 }}
+            styles={{ body: { padding: 32 } }}
           >
             <ReactECharts option={pieOption} style={{ height: 350 }} />
           </Card>
@@ -288,7 +288,7 @@ const Dashboard: React.FC = () => {
                 本学期收缴率
               </span>
             }
-            bodyStyle={{ padding: '8px 32px 32px' }}
+            styles={{ body: { padding: '8px 32px 32px' } }}
           >
             <ReactECharts option={gaugeOption} style={{ height: 320 }} />
           </Card>

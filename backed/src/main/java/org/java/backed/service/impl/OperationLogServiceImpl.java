@@ -11,14 +11,14 @@ public class OperationLogServiceImpl extends ServiceImpl<OperationLogMapper, Ope
         implements OperationLogService {
 
     @Override
-    public void saveLog(String operator, String module, String action, Long targetId, String detail, String ipAddress) {
+    public void saveLog(String username, String module, String action, String description, String ipAddress) {
         OperationLog log = new OperationLog();
-        log.setOperator(operator);
+        log.setUsername(username);
         log.setModule(module);
         log.setAction(action);
-        log.setTargetId(targetId);
-        log.setDetail(detail);
+        log.setDescription(description);
         log.setIpAddress(ipAddress);
+        log.setStatus("SUCCESS");
         save(log);
     }
 }

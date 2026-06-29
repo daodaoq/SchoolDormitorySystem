@@ -8,6 +8,7 @@ import org.java.backed.entity.SysUser;
 import org.java.backed.mapper.StudentDormitoryMapper;
 import org.java.backed.mapper.SysUserMapper;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -16,6 +17,7 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "app.init.enabled", havingValue = "true")
 public class DataInitializer implements CommandLineRunner {
 
     private final SysUserMapper userMapper;
@@ -24,8 +26,8 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        createIfAbsent("admin", "admin123", "系统管理员", "ADMIN");
-        createIfAbsent("teacher", "teacher123", "王老师", "TEACHER");
+        createIfAbsent("admin", "123456", "系统管理员", "ADMIN");
+        createIfAbsent("teacher", "123456", "王老师", "TEACHER");
 
         // 为所有未关联用户的学生自动创建系统账号
         List<StudentDormitory> students = studentMapper.selectList(null);

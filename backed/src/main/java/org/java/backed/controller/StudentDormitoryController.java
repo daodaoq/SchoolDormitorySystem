@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
 import org.java.backed.common.PageResult;
 import org.java.backed.common.Result;
+import org.java.backed.common.annotation.OpLog;
 import org.java.backed.entity.Dormitory;
 import org.java.backed.entity.StudentDormitory;
 import org.java.backed.entity.SysUser;
@@ -74,6 +75,7 @@ public class StudentDormitoryController {
     /**
      * 新增学生 — 同时自动创建对应的系统用户账号
      */
+    @OpLog(module = "学生管理", action = "新增", description = "新增学生 #{#student.studentName}")
     @PostMapping
     public Result<StudentDormitory> add(@RequestBody StudentDormitory student) {
         if (student.getStudentName() == null || student.getStudentName().isEmpty()) {
@@ -112,6 +114,7 @@ public class StudentDormitoryController {
     /**
      * Excel批量导入
      */
+    @OpLog(module = "学生管理", action = "导入", description = "批量导入学生")
     @PostMapping("/batch")
     public Result<Integer> importBatch(@RequestParam("file") MultipartFile file) {
         try {
@@ -126,6 +129,7 @@ public class StudentDormitoryController {
     /**
      * 更新学生信息
      */
+    @OpLog(module = "学生管理", action = "修改", description = "修改学生信息")
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody StudentDormitory student) {
         if (student.getStudentName() == null || student.getStudentName().isEmpty()) {
@@ -148,6 +152,7 @@ public class StudentDormitoryController {
     /**
      * 删除学生
      */
+    @OpLog(module = "学生管理", action = "删除", description = "删除学生")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         studentService.removeById(id);

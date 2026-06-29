@@ -8,5 +8,5 @@ import org.java.backed.entity.OperationLog;
  */
 public interface OperationLogService extends IService<OperationLog> {
 
-    void saveLog(String operator, String module, String action, Long targetId, String detail, String ipAddress);
+    void saveLog(String username, String module, String action, String description, String ipAddress);
 }

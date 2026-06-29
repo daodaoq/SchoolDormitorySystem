@@ -108,7 +108,7 @@ public class CitationParser {
                     i + 1,  // 默认编号 = 索引 + 1
                     (String) m.getOrDefault("chunkId", ""),
                     toLong(m.get("docId")),
-                    (String) m.getOrDefault("docTitle", "未知文档"),
+                    (String) m.getOrDefault("docTitle", "未知来源"),
                     (String) m.getOrDefault("content", ""),
                     toInt(m.get("chunkIndex")),
                     toDouble(m.get("score")),

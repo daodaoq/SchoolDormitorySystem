@@ -105,7 +105,7 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
           </div>
         </div>
       ) : chunks.length === 0 ? (
-        <Empty description="暂无法加载文档内容" />
+        <Empty description="文档已被删除或索引已过期" />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* 统计信息 */}

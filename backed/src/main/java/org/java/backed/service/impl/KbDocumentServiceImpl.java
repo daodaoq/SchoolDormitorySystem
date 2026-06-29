@@ -151,22 +151,31 @@ public class KbDocumentServiceImpl extends ServiceImpl<KbDocumentMapper, KbDocum
             // 2. Milvus 语义搜索
             List<MilvusVectorStoreService.SearchResult> results = milvusService.search(queryVec, topK);
 
-            // 3. 批量查文档标题
+            // 3. 批量查文档标题，跳过已删除的文档
             Map<Long, String> docTitles = new HashMap<>();
             for (var r : results) {
                 if (!docTitles.containsKey(r.docId())) {
                     KbDocument doc = getById(r.docId());
-                    docTitles.put(r.docId(), doc != null ? doc.getTitle() : "未知文档");
+                    if (doc != null) {
+                        docTitles.put(r.docId(), doc.getTitle());
+                    } else {
+                        // 文档已删除但 Milvus 中仍有残留向量 → 标记跳过并清理
+                        docTitles.put(r.docId(), null);
+                        log.info("清理 Milvus 残留向量: docId={}", r.docId());
+                        try { milvusService.deleteByDocId(r.docId()); } catch (Exception ignored) {}
+                    }
                 }
             }
 
-            // 4. 组装返回结果（含文档标题供引用）
+            // 4. 组装返回结果（含文档标题供引用），过滤已删除文档
             List<Map<String, Object>> output = new ArrayList<>();
             for (var r : results) {
+                String title = docTitles.get(r.docId());
+                if (title == null) continue; // 跳过已删除文档的结果
                 Map<String, Object> item = new LinkedHashMap<>();
                 item.put("chunkId", r.chunkId());
                 item.put("docId", r.docId());
-                item.put("docTitle", docTitles.getOrDefault(r.docId(), "未知文档"));
+                item.put("docTitle", title);
                 item.put("content", r.content());
                 item.put("chunkIndex", r.chunkIndex());
                 item.put("score", Math.round(r.score() * 10000.0) / 10000.0);

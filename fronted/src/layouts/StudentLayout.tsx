@@ -2,7 +2,7 @@ import React from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Layout, Space, Avatar, Dropdown, Typography } from 'antd';
 import { LogoutOutlined, UserOutlined, IdcardOutlined } from '@ant-design/icons';
-import { Home, FileText, CreditCard, Bot, User } from 'lucide-react';
+import { Home, FileText, Bot, User } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { ExpandableTabs } from '@/components/ui/expandable-tabs';
 
@@ -17,7 +17,6 @@ const { Text } = Typography;
 const tabs = [
   { title: '我的宿舍', icon: Home },
   { title: '我的账单', icon: FileText },
-  { title: '在线缴费', icon: CreditCard },
   { title: 'AI助手', icon: Bot },
   { title: '个人信息', icon: User },
 ];
@@ -25,17 +24,15 @@ const tabs = [
 const pathToIndex: Record<string, number> = {
   '/my-dormitory': 0,
   '/my-bills': 1,
-  '/payment': 2,
-  '/ai-qa': 3,
-  '/profile': 4,
+  '/ai-qa': 2,
+  '/profile': 3,
 };
 
 const indexToPath: Record<number, string> = {
   0: '/my-dormitory',
   1: '/my-bills',
-  2: '/payment',
-  3: '/ai-qa',
-  4: '/profile',
+  2: '/ai-qa',
+  3: '/profile',
 };
 
 const StudentLayout: React.FC = () => {
@@ -211,7 +208,7 @@ const StudentLayout: React.FC = () => {
         position: 'relative',
         zIndex: 1,
       }}>
-        智慧宿舍管理系统 © 2024 — 让校园生活更美好
+        智慧宿舍管理系统 © 2026 — 让校园生活更美好
       </Footer>
     </Layout>
   );
