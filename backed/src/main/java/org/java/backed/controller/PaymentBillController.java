@@ -3,6 +3,7 @@ package org.java.backed.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.java.backed.common.PageResult;
 import org.java.backed.common.Result;
+import org.java.backed.common.SnowflakeIdGenerator;
 import org.java.backed.entity.PaymentBill;
 import org.java.backed.service.PaymentBillService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,9 @@ public class PaymentBillController {
 
     @Autowired
     private PaymentBillService billService;
+
+    @Autowired
+    private SnowflakeIdGenerator idGenerator;
 
     /**
      * 分页查询账单
@@ -47,6 +51,22 @@ public class PaymentBillController {
     public Result<PaymentBill> getById(@PathVariable Long id) {
         PaymentBill bill = billService.getById(id);
         return bill != null ? Result.ok(bill) : Result.notFound("账单不存在");
+    }
+
+    /**
+     * 新建单条账单
+     */
+    @PostMapping
+    public Result<PaymentBill> createBill(@RequestBody PaymentBill bill) {
+        if (bill.getStudentId() == null) return Result.badRequest("请选择学生");
+        if (bill.getFeeItemId() == null) return Result.badRequest("请选择收费项目");
+        if (bill.getSemester() == null || bill.getSemester().isEmpty()) return Result.badRequest("学期不能为空");
+        bill.setBillNo(idGenerator.generateBillNo());
+        bill.setPaidAmount(bill.getPaidAmount() != null ? bill.getPaidAmount() : java.math.BigDecimal.ZERO);
+        if (bill.getDueDate() == null) bill.setDueDate(java.time.LocalDate.now().plusMonths(1));
+        bill.setStatus("UNPAID");
+        billService.save(bill);
+        return Result.ok(bill);
     }
 
     /**

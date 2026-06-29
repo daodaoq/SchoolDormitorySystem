@@ -52,7 +52,8 @@ const Statistics: React.FC = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      <Select placeholder="选择学期" allowClear style={{ width: 160, marginBottom: 16 }} value={semester || undefined} onChange={(v) => setSemester(v || '')}>
+      <div className="search-form">
+        <Select placeholder="选择学期" allowClear style={{ width: 160 }} value={semester || undefined} onChange={(v) => setSemester(v || '')}>
         {(() => {
           const currentYear = new Date().getFullYear();
           const options = [];
@@ -63,6 +64,7 @@ const Statistics: React.FC = () => {
           return options;
         })()}
       </Select>
+      </div>
       <Row gutter={[16, 16]}>
         <Col span={6}><Card style={cardStyle}><Statistic title="欠费总人数" value={arrears.totalCount || 0} /></Card></Col>
         <Col span={6}><Card style={cardStyle}><Statistic title="欠费总金额" value={arrears.totalArrears || 0} precision={2} /></Card></Col>

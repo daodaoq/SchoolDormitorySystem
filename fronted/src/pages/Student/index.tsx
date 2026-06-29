@@ -148,11 +148,13 @@ const Student: React.FC = () => {
           <Button type="primary" icon={<SearchOutlined />} onClick={fetchData}>搜索</Button>
         </Space>
       </div>
-      <Space style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+        <Space>
+          <Upload accept=".xlsx,.xls" showUploadList={false} beforeUpload={handleImport}><Button icon={<DownloadOutlined />}>批量导入</Button></Upload>
+          <Button icon={<UploadOutlined />} onClick={handleExport}>导出Excel</Button>
+        </Space>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增学生</Button>
-        <Upload accept=".xlsx,.xls" showUploadList={false} beforeUpload={handleImport}><Button icon={<DownloadOutlined />}>批量导入</Button></Upload>
-        <Button icon={<UploadOutlined />} onClick={handleExport}>导出Excel</Button>
-      </Space>
+      </div>
       <Table rowKey="id" columns={columns} dataSource={data} loading={loading} pagination={{ current: page, pageSize, total, onChange: (p, ps) => { setPage(p); setPageSize(ps); } }} />
       <Modal title={editingId ? '编辑学生' : '新增学生'} open={modalVisible} onOk={handleSubmit} onCancel={() => setModalVisible(false)} okText="确定" cancelText="取消">
         <Alert variant="warning" appearance="light" size="sm" className="mb-4">

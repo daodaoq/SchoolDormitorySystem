@@ -140,12 +140,12 @@ const Users: React.FC = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      <Space style={{ marginBottom: 16 }}>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增用户</Button>
+      <div className="search-form" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Select placeholder="角色筛选" allowClear style={{ width: 140 }} value={roleFilter} onChange={setRoleFilter}>
           {Object.entries(roleMap).map(([k, v]) => <Select.Option key={k} value={k}>{v.label}</Select.Option>)}
         </Select>
-      </Space>
+        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增用户</Button>
+      </div>
       <Table rowKey="id" columns={columns} dataSource={data} loading={loading}
         pagination={{ current: page, pageSize, total, onChange: (p, ps) => { setPage(p); setPageSize(ps); } }} />
 

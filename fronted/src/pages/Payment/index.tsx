@@ -47,12 +47,14 @@ const Payment: React.FC = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      <Space style={{ marginBottom: 16 }}>
-        <Input placeholder="学号筛选" allowClear style={{ width: 150 }}
-          value={studentNoFilter} onChange={e => setStudentNoFilter(e.target.value)}
-          onPressEnter={fetchRecords} />
-        <Button type="primary" onClick={fetchRecords}>搜索</Button>
-      </Space>
+      <div className="search-form">
+        <Space wrap>
+          <Input placeholder="学号筛选" allowClear style={{ width: 150 }}
+            value={studentNoFilter} onChange={e => setStudentNoFilter(e.target.value)}
+            onPressEnter={fetchRecords} />
+          <Button type="primary" onClick={fetchRecords}>搜索</Button>
+        </Space>
+      </div>
       <Table rowKey="id" columns={columns} dataSource={records} loading={loading}
         pagination={{ current: page, pageSize, total, onChange: (p, ps) => { setPage(p); setPageSize(ps); } }} />
     </div>

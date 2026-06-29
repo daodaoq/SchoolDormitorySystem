@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Space, Modal, Form, Input, Select, message, Tag } from 'antd';
-import { UploadOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { Table, Button, Space, Modal, Form, Input, Select, InputNumber, DatePicker, message, Tag } from 'antd';
+import { PlusOutlined, UploadOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { AlertTriangle } from 'lucide-react';
-import { getBills, generateBills, updateBillStatus, exportBills } from '../../services/api';
+import { getBills, createBill, generateBills, updateBillStatus, exportBills, getStudents, getActiveFeeItems } from '../../services/api';
 import { Alert, AlertIcon, AlertTitle } from '@/components/ui/alert-1';
 import type { PaymentBill } from '../../types';
+import dayjs from 'dayjs';
 
 const statusMap: Record<string, { color: string; text: string }> = {
   UNPAID: { color: 'orange', text: '未缴' }, PAID: { color: 'green', text: '已缴' },
@@ -19,9 +20,13 @@ const Bill: React.FC = () => {
   const [pageSize, setPageSize] = useState(10);
   const [filters, setFilters] = useState<Record<string, string | undefined>>({});
   const [generateModal, setGenerateModal] = useState(false);
+  const [createModal, setCreateModal] = useState(false);
   const [statusModal, setStatusModal] = useState(false);
   const [currentBill, setCurrentBill] = useState<PaymentBill | null>(null);
   const [form] = Form.useForm();
+  const [createForm] = Form.useForm();
+  const [students, setStudents] = useState<any[]>([]);
+  const [feeItems, setFeeItems] = useState<any[]>([]);
 
   useEffect(() => { fetchData(); }, [page, pageSize, filters]);
 
@@ -33,6 +38,33 @@ const Bill: React.FC = () => {
 
   const handleGenerate = async () => {
     try { const values = await form.validateFields(); const res = await generateBills(values); message.success(res.message); setGenerateModal(false); fetchData(); } catch (e: any) { if (!e?.errorFields) message.error('生成账单失败'); }
+  };
+
+  const openCreateModal = async () => {
+    try {
+      const [sRes, fRes] = await Promise.all([
+        getStudents({ pageSize: 9999 }),
+        getActiveFeeItems(),
+      ]);
+      setStudents(sRes.data.records || []);
+      setFeeItems(fRes.data || []);
+    } catch { /* */ }
+    createForm.resetFields();
+    createForm.setFieldsValue({ semester: new Date().getFullYear() + '-' + (new Date().getMonth() < 8 ? '1' : '2') });
+    setCreateModal(true);
+  };
+
+  const handleCreate = async () => {
+    try {
+      const values = await createForm.validateFields();
+      await createBill({
+        ...values,
+        dueDate: values.dueDate?.format('YYYY-MM-DD'),
+      });
+      message.success('账单创建成功');
+      setCreateModal(false);
+      fetchData();
+    } catch (e: any) { if (!e?.errorFields) message.error('创建账单失败'); }
   };
 
   const handleStatusUpdate = async () => {
@@ -83,11 +115,28 @@ const Bill: React.FC = () => {
           <Button type="primary" onClick={fetchData}>搜索</Button>
         </Space>
       </div>
-      <Space style={{ marginBottom: 16 }}>
-        <Button type="primary" icon={<ThunderboltOutlined />} onClick={() => { setGenerateModal(true); form.resetFields(); }}>生成账单</Button>
-        <Button icon={<UploadOutlined />} onClick={handleExport}>导出Excel</Button>
-      </Space>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+        <Space>
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>新建账单</Button>
+          <Button icon={<ThunderboltOutlined />} onClick={() => { setGenerateModal(true); form.resetFields(); }}>批量生成</Button>
+          <Button icon={<UploadOutlined />} onClick={handleExport}>导出Excel</Button>
+        </Space>
+      </div>
       <Table rowKey="id" columns={columns} dataSource={data} loading={loading} pagination={{ current: page, pageSize, total, onChange: (p, ps) => { setPage(p); setPageSize(ps); } }} />
+      <Modal title="新建账单" open={createModal} onOk={handleCreate} onCancel={() => setCreateModal(false)} okText="确定" cancelText="取消">
+        <Form form={createForm} layout="vertical">
+          <Form.Item name="studentId" label="学生" rules={[{ required: true, message: '请选择学生' }]}>
+            <Select showSearch placeholder="选择学生" filterOption={(input, option) => (option?.label as string || '').includes(input)}
+              options={students.map((s: any) => ({ label: `${s.studentName} (${s.studentNo})`, value: s.id }))} />
+          </Form.Item>
+          <Form.Item name="feeItemId" label="收费项目" rules={[{ required: true, message: '请选择收费项目' }]}>
+            <Select placeholder="选择收费项目" options={feeItems.map((f: any) => ({ label: `${f.itemName} (¥${f.unitPrice})`, value: f.id }))} />
+          </Form.Item>
+          <Form.Item name="semester" label="学期" rules={[{ required: true }]}><Input placeholder="如: 2026-1" /></Form.Item>
+          <Form.Item name="amount" label="金额" rules={[{ required: true }]}><InputNumber min={0} precision={2} style={{ width: '100%' }} /></Form.Item>
+          <Form.Item name="dueDate" label="截止日期"><DatePicker style={{ width: '100%' }} /></Form.Item>
+        </Form>
+      </Modal>
       <Modal title="生成账单" open={generateModal} onOk={handleGenerate} onCancel={() => setGenerateModal(false)} okText="确定" cancelText="取消">
         <Alert variant="warning" appearance="light" size="sm" className="mb-4">
           <AlertIcon><AlertTriangle className="size-3.5" /></AlertIcon>

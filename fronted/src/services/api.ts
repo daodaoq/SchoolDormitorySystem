@@ -55,6 +55,9 @@ export const deleteFeeItem = (id: number) =>
 export const getBills = (params: Record<string, any>) =>
   request.get<any, ApiResult<PageResult<any>>>('/bills', { params });
 
+export const createBill = (data: Record<string, any>) =>
+  request.post<any, ApiResult>('/bills', data);
+
 export const generateBills = (data: Record<string, any>) =>
   request.post<any, ApiResult>('/bills/generate', data);
 

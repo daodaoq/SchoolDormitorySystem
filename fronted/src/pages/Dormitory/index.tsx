@@ -75,7 +75,9 @@ const Dormitory: React.FC = () => {
           <Button type="primary" onClick={fetchData}>搜索</Button>
         </Space>
       </div>
-      <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} style={{ marginBottom: 16 }}>新增宿舍</Button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增宿舍</Button>
+      </div>
       <Table rowKey="id" columns={columns} dataSource={data} loading={loading} pagination={{ current: page, pageSize, total, onChange: (p, ps) => { setPage(p); setPageSize(ps); } }} />
       <Modal title={editingId ? '编辑宿舍' : '新增宿舍'} open={modalVisible} onOk={handleSubmit} onCancel={() => setModalVisible(false)} okText="确定" cancelText="取消">
         <Alert variant="warning" appearance="light" size="sm" className="mb-4">

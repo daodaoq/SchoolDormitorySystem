@@ -82,7 +82,9 @@ const Roles: React.FC = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} style={{ marginBottom: 16 }}>新增角色</Button>
+      <div className="search-form" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增角色</Button>
+      </div>
       <Table rowKey="id" columns={columns} dataSource={data} loading={loading} pagination={false} />
 
       <Modal title={editingId ? '编辑角色' : '新增角色'} open={modalVisible} onOk={handleSubmit} onCancel={() => setModalVisible(false)} okText="确定" cancelText="取消">
