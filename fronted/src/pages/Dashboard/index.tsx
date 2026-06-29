@@ -55,7 +55,7 @@ const Dashboard: React.FC = () => {
     try {
       const res = await getOverview();
       setData(res.data as DashboardOverview);
-    } catch { /* handled */ }
+    } catch { message.error('加载概览数据失败'); }
     setLoading(false);
   };
 
@@ -79,28 +79,66 @@ const Dashboard: React.FC = () => {
   };
 
   const gaugeOption = {
-    title: {
-      text: '本学期收缴率',
-      left: 'center',
-      textStyle: { color: '#1A1A1A', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 15 },
-    },
     series: [{
       type: 'gauge' as const,
-      startAngle: 180,
-      endAngle: 0,
+      startAngle: 210,
+      endAngle: -30,
       min: 0,
       max: 100,
+      center: ['50%', '58%'],
+      radius: '95%',
       splitNumber: 10,
-      axisLine: { lineStyle: { width: 20, color: [[0.3, '#E85D4E'], [0.7, '#F2D160'], [1, '#C4D94E']] } },
-      pointer: { length: '60%', width: 6, itemStyle: { color: '#1A1A1A' } },
+      progress: {
+        show: true,
+        width: 16,
+        roundCap: true,
+        itemStyle: {
+          color: {
+            type: 'linear' as const,
+            x: 0, y: 0, x2: 1, y2: 0,
+            colorStops: [
+              { offset: 0, color: '#E85D4E' },
+              { offset: 0.5, color: '#F2D160' },
+              { offset: 1, color: '#C4D94E' },
+            ],
+          },
+        },
+      },
+      axisLine: {
+        lineStyle: {
+          width: 16,
+          color: [[1, 'rgba(26,26,26,0.06)']],
+        },
+        roundCap: true,
+      },
+      axisTick: { show: false },
+      splitLine: { show: false },
+      axisLabel: {
+        distance: 10,
+        color: 'rgba(26,26,26,0.30)',
+        fontSize: 11,
+        fontFamily: "'Inter', sans-serif",
+      },
+      anchor: {
+        show: true,
+        size: 12,
+        itemStyle: { color: '#1A1A1A' },
+      },
+      pointer: {
+        show: false,
+      },
+      title: {
+        show: false,
+      },
       detail: {
         valueAnimation: true,
-        formatter: '{value}%',
-        fontSize: 20,
-        offsetCenter: [0, '60%'],
+        formatter: (value: number) => `${value}%`,
+        offsetCenter: [0, '32%'],
+        fontSize: 44,
         color: '#1A1A1A',
-        fontFamily: "'Space Grotesk', sans-serif",
-        fontWeight: 700,
+        fontFamily: "'Inter', 'SF Pro Display', sans-serif",
+        fontWeight: 800,
+        letterSpacing: -1,
       },
       data: [{ value: data.collectionRate || 0 }],
     }],
@@ -238,9 +276,21 @@ const Dashboard: React.FC = () => {
               border: '1px solid rgba(26,26,26,0.10)',
               boxShadow: '3px 3px 0 rgba(26,26,26,0.05)',
             }}
-            bodyStyle={{ padding: 32 }}
+            title={
+              <span style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: 14,
+                fontWeight: 600,
+                color: 'rgba(26,26,26,0.45)',
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase' as const,
+              }}>
+                本学期收缴率
+              </span>
+            }
+            bodyStyle={{ padding: '8px 32px 32px' }}
           >
-            <ReactECharts option={gaugeOption} style={{ height: 350 }} />
+            <ReactECharts option={gaugeOption} style={{ height: 320 }} />
           </Card>
         </Col>
       </Row>

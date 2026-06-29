@@ -32,7 +32,7 @@ const Dormitory: React.FC = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    try { const res = await getDormitories({ page, pageSize, ...filters }); setData(res.data.records); setTotal(res.data.total); } catch { /* */ }
+    try { const res = await getDormitories({ page, pageSize, ...filters }); setData(res.data.records); setTotal(res.data.total); } catch { message.error('加载宿舍数据失败'); }
     setLoading(false);
   };
 
@@ -45,7 +45,7 @@ const Dormitory: React.FC = () => {
       if (editingId) { await updateDormitory(editingId, values); message.success('更新成功'); }
       else { await addDormitory(values); message.success('添加成功'); }
       setModalVisible(false); fetchData();
-    } catch { /* */ }
+    } catch (e: any) { if (!e?.errorFields) message.error('操作失败，请稍后重试'); }
   };
 
   const columns = [
@@ -77,7 +77,7 @@ const Dormitory: React.FC = () => {
       </div>
       <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} style={{ marginBottom: 16 }}>新增宿舍</Button>
       <Table rowKey="id" columns={columns} dataSource={data} loading={loading} pagination={{ current: page, pageSize, total, onChange: (p, ps) => { setPage(p); setPageSize(ps); } }} />
-      <Modal title={editingId ? '编辑宿舍' : '新增宿舍'} open={modalVisible} onOk={handleSubmit} onCancel={() => setModalVisible(false)}>
+      <Modal title={editingId ? '编辑宿舍' : '新增宿舍'} open={modalVisible} onOk={handleSubmit} onCancel={() => setModalVisible(false)} okText="确定" cancelText="取消">
         <Alert variant="warning" appearance="light" size="sm" className="mb-4">
           <AlertIcon><AlertTriangle className="size-3.5" /></AlertIcon>
           <AlertTitle>带 * 的字段为必填项，请完整填写后提交</AlertTitle>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Table, Tag, Button, Spin, Empty, Statistic, Row, Col, message } from 'antd';
 import { DollarOutlined, ClockCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { Navigate } from 'react-router-dom';
 import { getBills, createPaymentOrder } from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
 import type { PaymentBill } from '../../types';
@@ -17,13 +18,18 @@ const MyBills: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [payingIds, setPayingIds] = useState<Set<number>>(new Set());
 
+  // 管理员/教师没有个人账单，重定向到账单管理
+  if (user?.role === 'ADMIN' || user?.role === 'TEACHER') {
+    return <Navigate to="/bills" replace />;
+  }
+
   useEffect(() => { loadBills(); }, []);
 
   const loadBills = async () => {
     try {
       const res = await getBills({ studentNo: user?.username, pageSize: 999 });
       setBills(res.data.records || []);
-    } catch { /* */ }
+    } catch { message.error('加载账单失败'); }
     setLoading(false);
   };
 

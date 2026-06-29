@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Table, Button, Space, Modal, Form, Input, Select, message, Tag } from 'antd';
-import { DownloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { UploadOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { AlertTriangle } from 'lucide-react';
 import { getBills, generateBills, updateBillStatus, exportBills } from '../../services/api';
 import { Alert, AlertIcon, AlertTitle } from '@/components/ui/alert-1';
@@ -27,12 +27,12 @@ const Bill: React.FC = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    try { const res = await getBills({ page, pageSize, ...filters }); setData(res.data.records); setTotal(res.data.total); } catch { /* handled */ }
+    try { const res = await getBills({ page, pageSize, ...filters }); setData(res.data.records); setTotal(res.data.total); } catch { message.error('加载账单数据失败'); }
     setLoading(false);
   };
 
   const handleGenerate = async () => {
-    try { const values = await form.validateFields(); const res = await generateBills(values); message.success(res.message); setGenerateModal(false); fetchData(); } catch { /* handled */ }
+    try { const values = await form.validateFields(); const res = await generateBills(values); message.success(res.message); setGenerateModal(false); fetchData(); } catch (e: any) { if (!e?.errorFields) message.error('生成账单失败'); }
   };
 
   const handleStatusUpdate = async () => {
@@ -40,7 +40,7 @@ const Bill: React.FC = () => {
       const values = await form.validateFields();
       if (currentBill) { await updateBillStatus(currentBill.id!, values); message.success('状态更新成功'); }
       setStatusModal(false); fetchData();
-    } catch { /* handled */ }
+    } catch (e: any) { if (!e?.errorFields) message.error('更新状态失败'); }
   };
 
   const handleExport = async () => {
@@ -50,7 +50,7 @@ const Bill: React.FC = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = '缴费账单.xlsx'; a.click();
       window.URL.revokeObjectURL(url);
-    } catch { /* handled */ }
+    } catch { message.error('导出失败'); }
   };
 
   const columns = [
@@ -85,17 +85,17 @@ const Bill: React.FC = () => {
       </div>
       <Space style={{ marginBottom: 16 }}>
         <Button type="primary" icon={<ThunderboltOutlined />} onClick={() => { setGenerateModal(true); form.resetFields(); }}>生成账单</Button>
-        <Button icon={<DownloadOutlined />} onClick={handleExport}>导出Excel</Button>
+        <Button icon={<UploadOutlined />} onClick={handleExport}>导出Excel</Button>
       </Space>
       <Table rowKey="id" columns={columns} dataSource={data} loading={loading} pagination={{ current: page, pageSize, total, onChange: (p, ps) => { setPage(p); setPageSize(ps); } }} />
-      <Modal title="生成账单" open={generateModal} onOk={handleGenerate} onCancel={() => setGenerateModal(false)}>
+      <Modal title="生成账单" open={generateModal} onOk={handleGenerate} onCancel={() => setGenerateModal(false)} okText="确定" cancelText="取消">
         <Alert variant="warning" appearance="light" size="sm" className="mb-4">
           <AlertIcon><AlertTriangle className="size-3.5" /></AlertIcon>
           <AlertTitle>请输入学期信息，系统将为所有学生生成对应学期的收费账单</AlertTitle>
         </Alert>
         <Form form={form} layout="vertical"><Form.Item name="semester" label="学期" rules={[{ required: true }]}><Input placeholder="如: 2024-1" /></Form.Item></Form>
       </Modal>
-      <Modal title="修正账单状态" open={statusModal} onOk={handleStatusUpdate} onCancel={() => setStatusModal(false)}>
+      <Modal title="修正账单状态" open={statusModal} onOk={handleStatusUpdate} onCancel={() => setStatusModal(false)} okText="确定" cancelText="取消">
         <Form form={form} layout="vertical">
           <Form.Item name="status" label="状态"><Select><Select.Option value="UNPAID">未缴</Select.Option><Select.Option value="PAID">已缴</Select.Option><Select.Option value="OVERDUE">逾期</Select.Option><Select.Option value="CANCELLED">已取消</Select.Option></Select></Form.Item>
           <Form.Item name="remark" label="备注"><Input.TextArea rows={3} /></Form.Item>

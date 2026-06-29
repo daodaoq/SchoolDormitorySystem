@@ -23,7 +23,7 @@ const MyDormitory: React.FC = () => {
         const res = await getOverview();
         setOverview(res.data);
       }
-    } catch { /* */ }
+    } catch { message.error('加载数据失败'); }
     setLoading(false);
   };
 

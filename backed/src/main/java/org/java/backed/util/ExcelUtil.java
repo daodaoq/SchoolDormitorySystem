@@ -57,7 +57,7 @@ public class ExcelUtil {
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("学生信息");
             Row header = sheet.createRow(0);
-            String[] titles = {"姓名", "学号", "宿舍号", "联系电话", "入住时间", "缴费状态"};
+            String[] titles = {"姓名", "学号", "宿舍号", "联系电话", "入住时间"};
             for (int i = 0; i < titles.length; i++) {
                 header.createCell(i).setCellValue(titles[i]);
             }
@@ -70,7 +70,6 @@ public class ExcelUtil {
                 row.createCell(2).setCellValue(s.getDormitoryNo());
                 row.createCell(3).setCellValue(s.getPhone() != null ? s.getPhone() : "");
                 row.createCell(4).setCellValue(s.getCheckInDate() != null ? s.getCheckInDate().toString() : "");
-                row.createCell(5).setCellValue(s.getPaymentStatus());
             }
 
             ByteArrayOutputStream bos = new ByteArrayOutputStream();

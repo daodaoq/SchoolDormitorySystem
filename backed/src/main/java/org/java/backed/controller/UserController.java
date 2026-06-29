@@ -79,6 +79,7 @@ public class UserController {
         if (params.containsKey("realName")) user.setRealName(params.get("realName"));
         if (params.containsKey("role")) user.setRole(params.get("role"));
         if (params.containsKey("status")) user.setStatus(params.get("status"));
+        if (params.containsKey("avatar")) user.setAvatar(params.get("avatar"));
         // 修改密码
         if (params.containsKey("password") && !params.get("password").isEmpty()) {
             user.setPassword(passwordEncoder.encode(params.get("password")));

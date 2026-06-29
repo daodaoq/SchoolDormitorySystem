@@ -92,17 +92,17 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             cellPaddingInline: 18,
           },
           Input: {
-            borderRadius: 9999,
-            borderRadiusLG: 9999,
-            borderRadiusSM: 9999,
+            borderRadius: 6,
+            borderRadiusLG: 6,
+            borderRadiusSM: 6,
             activeShadow: '0 0 0 2px rgba(232,93,78,0.12)',
             paddingInline: 16,
             paddingBlock: 8,
           },
           Select: {
-            borderRadius: 9999,
-            borderRadiusLG: 9999,
-            borderRadiusSM: 9999,
+            borderRadius: 6,
+            borderRadiusLG: 6,
+            borderRadiusSM: 6,
           },
           Modal: {
             borderRadiusLG: 32,

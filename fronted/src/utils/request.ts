@@ -10,7 +10,9 @@ request.interceptors.request.use((config) => {
   const auth = localStorage.getItem('auth');
   if (auth) {
     try {
-      const { token } = JSON.parse(auth);
+      const parsed = JSON.parse(auth);
+      // Zustand v5 persist 格式为 { state: {...}, version: 0 }，v4 为扁平结构
+      const token = parsed?.state?.token || parsed?.token;
       if (token) config.headers.Authorization = `Bearer ${token}`;
     } catch { /* ignore */ }
   }
@@ -19,6 +21,10 @@ request.interceptors.request.use((config) => {
 
 request.interceptors.response.use(
   (response) => {
+    // blob 响应（导出等）直接返回，不做 JSON 解析
+    if (response.config.responseType === 'blob') {
+      return response.data;
+    }
     const res = response.data;
     if (res.code !== 200) {
       if (res.code === 401) {

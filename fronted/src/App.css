@@ -12,6 +12,20 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ---- 数字字体 — Inter 清晰易读，等宽数字对齐 ---- */
+.ant-statistic-content-value,
+.ant-statistic-content-value-decimal,
+.ant-table-cell,
+.ant-tag {
+  font-family: var(--font-number);
+  font-feature-settings: "tnum" 1;
+}
+
+/* 大号统计数字 */
+.ant-statistic-content-value {
+  font-variant-numeric: tabular-nums;
+}
+
 #root {
   min-height: 100vh;
 }

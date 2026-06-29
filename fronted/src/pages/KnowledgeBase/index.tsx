@@ -15,6 +15,9 @@ interface KbDocument {
 const statusColors: Record<string, string> = {
   PENDING: 'default', PROCESSING: 'processing', COMPLETED: 'success', FAILED: 'error',
 };
+const statusLabels: Record<string, string> = {
+  PENDING: '待处理', PROCESSING: '处理中', COMPLETED: '已完成', FAILED: '失败',
+};
 
 const KnowledgeBase: React.FC = () => {
   const [docs, setDocs] = useState<KbDocument[]>([]);
@@ -191,7 +194,7 @@ const KnowledgeBase: React.FC = () => {
     },
     {
       title: '状态', dataIndex: 'status', width: 90,
-      render: (s: string) => <Tag color={statusColors[s] || 'default'}>{s}</Tag>,
+      render: (s: string) => <Tag color={statusColors[s] || 'default'}>{statusLabels[s] || s}</Tag>,
     },
     {
       title: '上传时间', dataIndex: 'createTime', width: 150,

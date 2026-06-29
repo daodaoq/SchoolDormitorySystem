@@ -2,8 +2,10 @@ package org.java.backed.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
+import org.java.backed.entity.FeeItem;
 import org.java.backed.entity.PaymentBill;
 import org.java.backed.entity.StudentDormitory;
+import org.java.backed.service.FeeItemService;
 import org.java.backed.service.PaymentBillService;
 import org.java.backed.service.PaymentService;
 import org.java.backed.service.StatisticsService;
@@ -20,10 +22,25 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class StatisticsServiceImpl implements StatisticsService {
+
+    /** fee_type 英文代码 → 中文名称 */
+    private static final Map<String, String> FEE_TYPE_CN = Map.of(
+            "ACCOMMODATION", "住宿费",
+            "WATER", "水费",
+            "ELECTRICITY", "电费",
+            "AC", "空调费",
+            "NETWORK", "网络费",
+            "OTHER", "其他"
+    );
+
+    private String toFeeTypeCn(String feeType) {
+        return FEE_TYPE_CN.getOrDefault(feeType, feeType);
+    }
 
     @Autowired
     private StudentDormitoryService studentService;
@@ -33,6 +50,9 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     @Autowired
     private PaymentService paymentService;
+
+    @Autowired
+    private FeeItemService feeItemService;
 
     @Override
     @Cacheable(cacheNames = CacheConfig.CACHE_STATS, key = "'overview'")
@@ -73,15 +93,22 @@ public class StatisticsServiceImpl implements StatisticsService {
         long unpaidCount = billService.count(unpaidWrapper);
         overview.put("unpaidCount", unpaidCount);
 
+        // 构建 feeItemId → feeType 映射，解决 PaymentBill.feeType 为 transient 字段的问题
+        Map<Long, String> feeTypeMap = feeItemService.list().stream()
+                .collect(Collectors.toMap(
+                        FeeItem::getId,
+                        fi -> fi.getFeeType() != null ? fi.getFeeType() : "OTHER",
+                        (a, b) -> a));
+
         List<Map<String, Object>> feeTypeDistribution = new ArrayList<>();
         Map<String, List<PaymentBill>> grouped = new HashMap<>();
         for (PaymentBill bill : semesterBills) {
-            String feeType = bill.getFeeType() != null ? bill.getFeeType() : "OTHER";
+            String feeType = feeTypeMap.getOrDefault(bill.getFeeItemId(), "OTHER");
             grouped.computeIfAbsent(feeType, k -> new ArrayList<>()).add(bill);
         }
         for (Map.Entry<String, List<PaymentBill>> entry : grouped.entrySet()) {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("feeType", entry.getKey());
+            item.put("feeType", toFeeTypeCn(entry.getKey()));
             item.put("count", entry.getValue().size());
             item.put("totalAmount", entry.getValue().stream()
                     .map(PaymentBill::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add));
@@ -136,9 +163,15 @@ public class StatisticsServiceImpl implements StatisticsService {
         wrapper.eq(PaymentBill::getSemester, semester);
         List<PaymentBill> bills = billService.list(wrapper);
 
+        Map<Long, String> feeTypeMap = feeItemService.list().stream()
+                .collect(Collectors.toMap(
+                        FeeItem::getId,
+                        fi -> fi.getFeeType() != null ? fi.getFeeType() : "OTHER",
+                        (a, b) -> a));
+
         Map<String, List<PaymentBill>> grouped = new HashMap<>();
         for (PaymentBill bill : bills) {
-            String feeType = bill.getFeeType() != null ? bill.getFeeType() : "OTHER";
+            String feeType = feeTypeMap.getOrDefault(bill.getFeeItemId(), "OTHER");
             grouped.computeIfAbsent(feeType, k -> new ArrayList<>()).add(bill);
         }
 
@@ -150,7 +183,7 @@ public class StatisticsServiceImpl implements StatisticsService {
             BigDecimal collected = totalAmount.compareTo(BigDecimal.ZERO) > 0
                     ? paidAmount.multiply(BigDecimal.valueOf(100)).divide(totalAmount, 2, RoundingMode.HALF_UP)
                     : BigDecimal.ZERO;
-            item.put("feeType", entry.getKey());
+            item.put("feeType", toFeeTypeCn(entry.getKey()));
             item.put("totalCount", typeBills.size());
             item.put("collectedCount", typeBills.stream().filter(b -> "PAID".equals(b.getStatus())).count());
             item.put("totalAmount", totalAmount);

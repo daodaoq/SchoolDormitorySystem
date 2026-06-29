@@ -25,6 +25,12 @@ const sourceColors: Record<string, string> = {
   GREETING: '#8BB4F7', OFF_TOPIC: '#F2D160',
 };
 
+const sourceLabelMap: Record<string, string> = {
+  AI: 'AI模型', AI_STREAM: 'AI流式', LOCAL_KB: '本地知识库', CACHE: '缓存',
+  FALLBACK: '降级回复', RATE_LIMIT: '限流', SYSTEM: '系统', ERROR: '错误',
+  GREETING: '欢迎', OFF_TOPIC: '超出范围',
+};
+
 const quickQuestions = [
   { q: '住宿费多少钱？', color: '#E85D4E' },
   { q: '怎么缴费？', color: '#C4D94E' },
@@ -634,7 +640,7 @@ const MessageBubble: React.FC<{
           <Tag color={sourceColors[msg.source] || '#C5B5E0'} style={{
             marginTop: 6, fontSize: 11, borderRadius: 9999, border: '1px solid rgba(26,26,26,0.10)',
           }}>
-            {msg.source}
+            {sourceLabelMap[msg.source] || msg.source}
           </Tag>
         )}
 

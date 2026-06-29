@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -43,6 +44,9 @@ public class StudentDormitoryController {
     @Autowired
     private SysUserMapper sysUserMapper;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     /**
      * 分页+多条件查询
      */
@@ -68,7 +72,7 @@ public class StudentDormitoryController {
     }
 
     /**
-     * 新增学生
+     * 新增学生 — 同时自动创建对应的系统用户账号
      */
     @PostMapping
     public Result<StudentDormitory> add(@RequestBody StudentDormitory student) {
@@ -85,6 +89,23 @@ public class StudentDormitoryController {
             return Result.badRequest("宿舍号不存在，请先创建该宿舍");
         }
         studentService.save(student);
+
+        // 自动创建对应的系统用户（如果不存在）
+        LambdaQueryWrapper<SysUser> userWrapper = new LambdaQueryWrapper<>();
+        userWrapper.eq(SysUser::getUsername, student.getStudentNo());
+        if (sysUserMapper.selectCount(userWrapper) == 0) {
+            SysUser user = new SysUser();
+            user.setUsername(student.getStudentNo());
+            user.setPassword(passwordEncoder.encode("123456"));
+            user.setRealName(student.getStudentName());
+            user.setRole("STUDENT");
+            user.setStatus("ACTIVE");
+            sysUserMapper.insert(user);
+            // 回写 userId 到学生记录
+            student.setUserId(user.getId());
+            studentService.updateById(student);
+        }
+
         return Result.ok(student);
     }
 

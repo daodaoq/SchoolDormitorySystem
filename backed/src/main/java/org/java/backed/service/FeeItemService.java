@@ -11,7 +11,7 @@ import java.util.List;
  */
 public interface FeeItemService extends IService<FeeItem> {
 
-    Page<FeeItem> queryPage(int pageNum, int pageSize, String feeType, String status);
+    Page<FeeItem> queryPage(int pageNum, int pageSize, String itemName, String feeType, String status);
 
     List<FeeItem> getActiveFeeItems();
 

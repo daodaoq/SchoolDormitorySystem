@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Layout, Avatar, Dropdown, Typography } from 'antd';
 import * as Icons from '@ant-design/icons';
-import { LogoutOutlined, UserOutlined, RightOutlined, DownOutlined, IdcardOutlined } from '@ant-design/icons';
+import { LogoutOutlined, UserOutlined, IdcardOutlined } from '@ant-design/icons';
 import { useAuthStore } from '../stores/authStore';
 import type { MenuItem } from '../types';
 
 const { Content } = Layout;
-const { Text } = Typography;
 
 /** 动态获取 Ant Design 图标 */
 const getIcon = (iconName?: string): React.ReactNode => {
@@ -32,6 +31,16 @@ const BasicLayout: React.FC = () => {
   const menus = useAuthStore((s) => s.menus);
   const logout = useAuthStore((s) => s.logout);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const lastClickRef = useRef(0);
+
+  /** 防抖导航：200ms 内重复点击同路径或过快点击都会被忽略 */
+  const safeNavigate = useCallback((path: string) => {
+    const now = Date.now();
+    if (now - lastClickRef.current < 200) return;          // 过快点击，忽略
+    if (path === location.pathname) return;                // 已在目标页面，忽略
+    lastClickRef.current = now;
+    navigate(path, { replace: true });
+  }, [navigate, location.pathname]);
 
   // 过滤出一级菜单
   const topMenus = menus
@@ -40,11 +49,22 @@ const BasicLayout: React.FC = () => {
 
   // 首次渲染时自动展开包含当前路径的父菜单
   React.useEffect(() => {
+    const toExpand: string[] = [];
     topMenus.forEach((menu) => {
       if (isMenuActive(menu, location.pathname) && menu.children?.length) {
-        setExpanded((prev) => new Set([...prev, String(menu.id)]));
+        toExpand.push(String(menu.id));
       }
     });
+    if (toExpand.length > 0) {
+      setExpanded((prev) => {
+        let changed = false;
+        const next = new Set(prev);
+        for (const id of toExpand) {
+          if (!next.has(id)) { next.add(id); changed = true; }
+        }
+        return changed ? next : prev; // 无变化则返回原引用，避免重渲染
+      });
+    }
   }, [location.pathname]);
 
   const toggleExpand = (id: string) => {
@@ -93,7 +113,7 @@ const BasicLayout: React.FC = () => {
             borderBottom: '1px solid rgba(26,26,26,0.10)',
             cursor: 'pointer',
           }}
-          onClick={() => navigate('/dashboard')}
+          onClick={() => safeNavigate('/dashboard')}
         >
           <h2
             style={{
@@ -144,11 +164,12 @@ const BasicLayout: React.FC = () => {
               <div key={menu.id}>
                 {/* 一级菜单 */}
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
                     if (hasChildren) {
                       toggleExpand(String(menu.id));
                     } else if (menu.path) {
-                      navigate(menu.path);
+                      safeNavigate(menu.path);
                     }
                   }}
                   style={{
@@ -205,8 +226,9 @@ const BasicLayout: React.FC = () => {
                         return (
                           <button
                             key={child.id}
-                            onClick={() => {
-                              if (child.path) navigate(child.path);
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (child.path) safeNavigate(child.path);
                             }}
                             style={{
                               display: 'flex',

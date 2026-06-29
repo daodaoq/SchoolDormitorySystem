@@ -15,17 +15,15 @@ import KnowledgeBase from './pages/KnowledgeBase';
 import Users from './pages/Users';
 import Roles from './pages/Roles';
 import Dormitory from './pages/Dormitory';
-import Menus from './pages/Menus';
-import Personnel from './pages/Personnel';
+
 import MyDormitory from './pages/MyDormitory';
 import MyBills from './pages/MyBills';
 import Profile from './pages/Profile';
 
 const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isAuthenticated = useAuthStore((s) => !!s.token);
-const initializing = useAuthStore((s) => s.initializing);
+  const initializing = useAuthStore((s) => s.initializing);
 
-  // 初始化阶段显示 loading，不跳转，避免闪跳 bug
   if (initializing) {
     return (
       <div style={{
@@ -49,6 +47,17 @@ const initializing = useAuthStore((s) => s.initializing);
   return <>{children}</>;
 };
 
+/** 角色守卫 — 限制学生端路由只能学生访问，后台路由只能管理员/教师访问 */
+const RequireRole: React.FC<{ roles: string[]; children: React.ReactNode }> = ({ roles, children }) => {
+  const user = useAuthStore((s) => s.user);
+  if (!user || !roles.includes(user.role)) {
+    // 无权限 → 跳回对应首页
+    const home = user?.role === 'STUDENT' ? '/my-dormitory' : '/dashboard';
+    return <Navigate to={home} replace />;
+  }
+  return <>{children}</>;
+};
+
 /** 根据角色选择布局 */
 const LayoutSwitcher: React.FC = () => {
   const user = useAuthStore((s) => s.user);
@@ -61,25 +70,29 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<RequireAuth><LayoutSwitcher /></RequireAuth>}>
-        {/* 学生端路由 */}
         <Route index element={<RoleHome />} />
-        <Route path="my-dormitory" element={<MyDormitory />} />
-        <Route path="my-bills" element={<MyBills />} />
+
+        {/* 学生端专属路由 */}
+        <Route path="my-dormitory" element={<RequireRole roles={['STUDENT']}><MyDormitory /></RequireRole>} />
+
+        {/* 我的账单 — 学生专属 */}
+        <Route path="my-bills" element={<RequireRole roles={['STUDENT']}><MyBills /></RequireRole>} />
+
+        {/* 后台管理专属路由 */}
+        <Route path="dashboard" element={<RequireRole roles={['ADMIN', 'TEACHER']}><Dashboard /></RequireRole>} />
+        <Route path="students" element={<RequireRole roles={['ADMIN', 'TEACHER']}><Student /></RequireRole>} />
+        <Route path="fee-items" element={<RequireRole roles={['ADMIN', 'TEACHER']}><FeeItem /></RequireRole>} />
+        <Route path="bills" element={<RequireRole roles={['ADMIN', 'TEACHER']}><Bill /></RequireRole>} />
+        <Route path="payment" element={<RequireRole roles={['ADMIN', 'TEACHER']}><Payment /></RequireRole>} />
+        <Route path="statistics" element={<RequireRole roles={['ADMIN', 'TEACHER']}><Statistics /></RequireRole>} />
+        <Route path="dormitories" element={<RequireRole roles={['ADMIN', 'TEACHER']}><Dormitory /></RequireRole>} />
+        <Route path="users" element={<RequireRole roles={['ADMIN', 'TEACHER']}><Users /></RequireRole>} />
+        <Route path="roles" element={<RequireRole roles={['ADMIN', 'TEACHER']}><Roles /></RequireRole>} />
+
+        {/* 所有角色可访问 */}
         <Route path="profile" element={<Profile />} />
-        {/* 通用路由 */}
-        <Route path="dashboard" element={<Dashboard />} />
-        <Route path="students" element={<Student />} />
-        <Route path="fee-items" element={<FeeItem />} />
-        <Route path="bills" element={<Bill />} />
-        <Route path="payments" element={<Payment />} />
-        <Route path="statistics" element={<Statistics />} />
         <Route path="ai-qa" element={<AiQa />} />
         <Route path="knowledge-base" element={<KnowledgeBase />} />
-        <Route path="dormitories" element={<Dormitory />} />
-        <Route path="users" element={<Users />} />
-        <Route path="roles" element={<Roles />} />
-        <Route path="menus" element={<Menus />} />
-        <Route path="personnel" element={<Personnel />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

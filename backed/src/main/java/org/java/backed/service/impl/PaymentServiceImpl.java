@@ -160,7 +160,7 @@ public class PaymentServiceImpl extends ServiceImpl<PaymentRecordMapper, Payment
         LambdaQueryWrapper<PaymentRecord> wrapper = new LambdaQueryWrapper<>();
         if (studentNo != null && !studentNo.isEmpty()) {
             LambdaQueryWrapper<StudentDormitory> stuWrapper = new LambdaQueryWrapper<>();
-            stuWrapper.eq(StudentDormitory::getStudentNo, studentNo);
+            stuWrapper.like(StudentDormitory::getStudentNo, studentNo);
             StudentDormitory student = studentService.getOne(stuWrapper);
             if (student != null) wrapper.eq(PaymentRecord::getStudentId, student.getId());
         }

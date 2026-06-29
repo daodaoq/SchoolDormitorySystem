@@ -43,7 +43,7 @@ public class PaymentBillServiceImpl extends ServiceImpl<PaymentBillMapper, Payme
     public Page<PaymentBill> queryPage(int pageNum, int pageSize, String studentNo,
                                         String dormitoryNo, String semester, String status, String feeType) {
         LambdaQueryWrapper<StudentDormitory> studentWrapper = new LambdaQueryWrapper<>();
-        studentWrapper.eq(studentNo != null && !studentNo.isEmpty(), StudentDormitory::getStudentNo, studentNo);
+        studentWrapper.like(studentNo != null && !studentNo.isEmpty(), StudentDormitory::getStudentNo, studentNo);
         studentWrapper.like(dormitoryNo != null && !dormitoryNo.isEmpty(), StudentDormitory::getDormitoryNo, dormitoryNo);
         List<Long> studentIds = studentService.list(studentWrapper).stream().map(StudentDormitory::getId).toList();
 

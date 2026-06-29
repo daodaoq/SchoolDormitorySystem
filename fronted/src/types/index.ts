@@ -21,6 +21,8 @@ export interface StudentDormitory {
   phone?: string;
   checkInDate?: string;
   paymentStatus: string;
+  photo?: string;
+  userId?: number;
   createTime?: string;
 }
 
@@ -148,4 +150,6 @@ export interface UserInfo {
   realName: string;
   role: string;
   status: string;
+  avatar?: string;
+  createTime?: string;
 }

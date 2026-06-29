@@ -29,9 +29,10 @@ public class FeeItemServiceImpl extends ServiceImpl<FeeItemMapper, FeeItem> impl
     }
 
     @Override
-    public Page<FeeItem> queryPage(int pageNum, int pageSize, String feeType, String status) {
+    public Page<FeeItem> queryPage(int pageNum, int pageSize, String itemName, String feeType, String status) {
         LambdaQueryWrapper<FeeItem> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(feeType != null && !feeType.isEmpty(), FeeItem::getFeeType, feeType);
+        wrapper.like(itemName != null && !itemName.isEmpty(), FeeItem::getItemName, itemName);
+        wrapper.like(feeType != null && !feeType.isEmpty(), FeeItem::getFeeType, feeType);
         wrapper.eq(status != null && !status.isEmpty(), FeeItem::getStatus, status);
         wrapper.orderByDesc(FeeItem::getCreateTime);
         return page(new Page<>(pageNum, pageSize), wrapper);

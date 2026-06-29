@@ -116,19 +116,6 @@ export const updateDormitory = (id: number, data: any) =>
 export const deleteDormitory = (id: number) =>
   request.delete<any, ApiResult>(`/dormitories/${id}`);
 
-// ===== 菜单管理 =====
-export const getMenuTree = () =>
-  request.get<any, ApiResult>('/menus/tree');
-
-export const addMenu = (data: any) =>
-  request.post<any, ApiResult>('/menus', data);
-
-export const updateMenu = (id: number, data: any) =>
-  request.put<any, ApiResult>(`/menus/${id}`, data);
-
-export const deleteMenu = (id: number) =>
-  request.delete<any, ApiResult>(`/menus/${id}`);
-
 // ===== AI问答 =====
 export const askAi = (question: string, userId?: string) =>
   request.post<any, ApiResult>('/ai/ask', { question, userId: userId || 'anonymous' });
@@ -163,8 +150,9 @@ export const askAiStream = (
     try {
       const auth = localStorage.getItem('auth');
       if (auth) {
-        const { token } = JSON.parse(auth);
-        return token || '';
+        const parsed = JSON.parse(auth);
+        // Zustand v5 persist 格式为 { state: {...}, version: 0 }，v4 为扁平结构
+        return parsed?.state?.token || parsed?.token || '';
       }
     } catch { /* ignore */ }
     return '';

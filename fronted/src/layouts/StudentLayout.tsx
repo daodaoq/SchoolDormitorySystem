@@ -25,7 +25,7 @@ const tabs = [
 const pathToIndex: Record<string, number> = {
   '/my-dormitory': 0,
   '/my-bills': 1,
-  '/payments': 2,
+  '/payment': 2,
   '/ai-qa': 3,
   '/profile': 4,
 };
@@ -33,7 +33,7 @@ const pathToIndex: Record<string, number> = {
 const indexToPath: Record<number, string> = {
   0: '/my-dormitory',
   1: '/my-bills',
-  2: '/payments',
+  2: '/payment',
   3: '/ai-qa',
   4: '/profile',
 };
@@ -157,30 +157,25 @@ const StudentLayout: React.FC = () => {
             ],
           }}
         >
-          <Space
-            style={{
-              cursor: 'pointer',
-              padding: '8px 20px 8px 10px',
-              borderRadius: 9999,
+          <Space style={{ cursor: 'pointer' }}>
+            <div style={{
+              width: 34,
+              height: 34,
+              borderRadius: '50%',
               border: '1px solid rgba(26,26,26,0.12)',
-              background: '#F5F5F0',
-              transition: 'box-shadow 0.15s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '2px 2px 0 rgba(26,26,26,0.04)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-          >
-            <Avatar
-              icon={<UserOutlined />}
-              size={32}
-              style={{
-                background: 'var(--coral)',
-                color: '#fff',
-              }}
-            />
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <Avatar
+                icon={<UserOutlined />}
+                size={24}
+                style={{
+                  background: 'transparent',
+                  color: '#1A1A1A',
+                }}
+              />
+            </div>
             <span style={{ fontSize: 14, color: '#1A1A1A', fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif" }}>
               {user?.realName || user?.username}
             </span>

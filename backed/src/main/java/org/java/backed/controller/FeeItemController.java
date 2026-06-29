@@ -24,9 +24,10 @@ public class FeeItemController {
     public Result<PageResult<FeeItem>> queryPage(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize,
+            @RequestParam(required = false) String itemName,
             @RequestParam(required = false) String feeType,
             @RequestParam(required = false) String status) {
-        Page<FeeItem> result = feeItemService.queryPage(page, pageSize, feeType, status);
+        Page<FeeItem> result = feeItemService.queryPage(page, pageSize, itemName, feeType, status);
         return Result.ok(PageResult.from(result));
     }
 

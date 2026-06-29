@@ -287,19 +287,19 @@ INSERT INTO student_dormitory (student_name, student_no, dormitory_no, phone, ch
 ('赵六', '2024004', 'B-202', '13800138004', '2024-09-01', 'UNPAID'),
 ('陈七', '2024005', 'C-301', '13800138005', '2024-09-01', 'PAID');
 
--- 账单
+-- 账单（学期按当前日期动态匹配；如手动初始化后日期已过，请按需调整 semester 与 due_date）
 INSERT INTO payment_bill (student_id, fee_item_id, bill_no, semester, amount, paid_amount, due_date, status) VALUES
-(1, 1, 'BILL20240901001', '2024-1', 1200.00, 1200.00, '2024-10-01', 'PAID'),
-(2, 1, 'BILL20240901002', '2024-1', 1200.00, 0.00, '2024-10-01', 'UNPAID'),
-(3, 1, 'BILL20240901003', '2024-1', 1200.00, 0.00, '2024-09-15', 'OVERDUE'),
-(2, 2, 'BILL20240901004', '2024-1', 50.00, 0.00, '2024-10-01', 'UNPAID'),
-(4, 3, 'BILL20240901005', '2024-1', 120.00, 0.00, '2024-10-01', 'UNPAID'),
-(5, 1, 'BILL20240901006', '2024-1', 1200.00, 1200.00, '2024-10-01', 'PAID');
+(1, 1, 'BILL20260901001', '2026-1', 1200.00, 1200.00, '2026-10-01', 'PAID'),
+(2, 1, 'BILL20260901002', '2026-1', 1200.00, 0.00, '2026-10-01', 'UNPAID'),
+(3, 1, 'BILL20260901003', '2026-1', 1200.00, 0.00, '2026-06-15', 'OVERDUE'),
+(2, 2, 'BILL20260901004', '2026-1', 50.00, 0.00, '2026-10-01', 'UNPAID'),
+(4, 3, 'BILL20260901005', '2026-1', 120.00, 0.00, '2026-10-01', 'UNPAID'),
+(5, 1, 'BILL20260901006', '2026-1', 1200.00, 1200.00, '2026-10-01', 'PAID');
 
 -- 支付记录
 INSERT INTO payment_record (bill_id, student_id, order_no, amount, pay_method, trade_no, pay_time, status) VALUES
-(1, 1, 'PAY20240901001', 1200.00, 'ALIPAY', 'TRADE20240901001', '2024-09-05 10:30:00', 'SUCCESS'),
-(6, 5, 'PAY20240901002', 1200.00, 'ALIPAY', 'TRADE20240901002', '2024-09-06 14:20:00', 'SUCCESS');
+(1, 1, 'PAY20260901001', 1200.00, 'ALIPAY', 'TRADE20260901001', '2026-06-05 10:30:00', 'SUCCESS'),
+(6, 5, 'PAY20260901002', 1200.00, 'ALIPAY', 'TRADE20260901002', '2026-06-06 14:20:00', 'SUCCESS');
 
 -- 角色
 INSERT INTO sys_role (role_code, role_name, description, status) VALUES
@@ -320,7 +320,6 @@ INSERT INTO sys_menu (id, parent_id, menu_name, menu_type, path, icon, permissio
 (9, 0, '系统管理', 'MENU', '/system', 'SettingOutlined', 'system:view', 9, 1),
 (10, 9, '用户管理', 'MENU', '/users', 'TeamOutlined', 'user:view', 1, 1),
 (11, 9, '角色管理', 'MENU', '/roles', 'SafetyOutlined', 'role:view', 2, 1),
-(12, 9, '菜单管理', 'MENU', '/menus', 'MenuOutlined', 'menu:view', 3, 1),
 (13, 0, 'AI问答', 'MENU', '/ai-qa', 'RobotOutlined', 'ai:view', 10, 1),
 (14, 0, '知识库', 'MENU', '/knowledge-base', 'BookOutlined', 'kb:view', 11, 1),
 (15, 9, '人员管理', 'MENU', '/personnel', 'IdcardOutlined', 'personnel:view', 4, 1);

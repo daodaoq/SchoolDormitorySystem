@@ -62,6 +62,7 @@
   /* 字体 */
   --font-display: 'Bodoni Moda', 'Noto Serif SC', serif;
   --font-body:    'Space Grotesk', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-number:  'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
   --font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* 药丸圆角 */

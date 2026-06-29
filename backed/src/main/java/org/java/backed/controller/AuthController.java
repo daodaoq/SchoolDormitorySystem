@@ -12,12 +12,14 @@ import org.java.backed.mapper.SysRoleMapper;
 import org.java.backed.mapper.SysUserMapper;
 import org.java.backed.service.MenuService;
 import org.java.backed.util.JwtUtil;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -30,14 +32,33 @@ public class AuthController {
     private final JwtUtil jwtUtil;
     private final MenuService menuService;
     private final StudentDormitoryMapper studentDormitoryMapper;
+    private final StringRedisTemplate stringRedisTemplate;
+
+    /** 登录限流：同一IP每分钟最多10次尝试 */
+    private boolean checkRateLimit(String key) {
+        String redisKey = "rate_limit:login:" + key;
+        Long count = stringRedisTemplate.opsForValue().increment(redisKey);
+        if (count != null && count == 1) {
+            stringRedisTemplate.expire(redisKey, 1, TimeUnit.MINUTES);
+        }
+        return count != null && count <= 10;
+    }
 
     @PostMapping("/login")
-    public Result<?> login(@RequestBody Map<String, String> params) {
+    public Result<?> login(@RequestBody Map<String, String> params,
+                           @RequestHeader(value = "X-Forwarded-For", required = false) String forwardedFor,
+                           jakarta.servlet.http.HttpServletRequest request) {
         String username = params.get("username");
         String password = params.get("password");
 
         if (username == null || password == null) {
             return Result.badRequest("用户名和密码不能为空");
+        }
+
+        // 限流：按用户名 + IP
+        String clientIp = forwardedFor != null ? forwardedFor.split(",")[0].trim() : request.getRemoteAddr();
+        if (!checkRateLimit(username) || !checkRateLimit(clientIp)) {
+            return Result.fail(429, "请求过于频繁，请稍后再试");
         }
 
         SysUser user = userMapper.selectOne(
