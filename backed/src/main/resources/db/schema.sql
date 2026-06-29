@@ -151,6 +151,7 @@ CREATE TABLE ai_qa_log (
     model_name VARCHAR(50) DEFAULT NULL COMMENT 'AI模型名称',
     response_time INT DEFAULT NULL COMMENT '响应时间(ms)',
     token_count INT DEFAULT NULL COMMENT 'Token消耗量（估算）',
+    citations TEXT DEFAULT NULL COMMENT '引用来源列表（JSON格式）',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     INDEX idx_user_id (user_id),
     INDEX idx_source (source),
@@ -179,6 +180,7 @@ CREATE TABLE kb_document (
 CREATE TABLE kb_chunk (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     document_id BIGINT NOT NULL COMMENT '关联文档ID',
+    chunk_id VARCHAR(64) DEFAULT NULL COMMENT 'Milvus chunk_id，用于交叉引用',
     chunk_index INT NOT NULL COMMENT '分块序号(从0开始)',
     content TEXT NOT NULL COMMENT '分块文本内容',
     token_count INT DEFAULT NULL COMMENT 'Token数量估算',
@@ -330,3 +332,9 @@ INSERT INTO sys_role_menu (role_id, menu_id) VALUES
 (3, 1), (3, 8), (3, 13);
 
 -- 注：sys_user 由 DataInitializer 在启动时自动创建（含BCrypt加密密码），不在此处手插明文
+
+-- ==================== 升级迁移 (AI 溯源功能) ====================
+-- 如果从旧版本升级，请执行以下 SQL：
+-- ALTER TABLE ai_qa_log ADD COLUMN IF NOT EXISTS citations TEXT COMMENT '引用来源列表（JSON格式）';
+-- ALTER TABLE kb_chunk ADD COLUMN IF NOT EXISTS chunk_id VARCHAR(64) COMMENT 'Milvus chunk_id，用于交叉引用';
+-- 注意：Milvus 的 chunk_index 字段需要重建 Collection 并重新处理文档

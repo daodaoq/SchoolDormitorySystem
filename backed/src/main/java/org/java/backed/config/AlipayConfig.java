@@ -56,13 +56,28 @@ public class AlipayConfig {
 
     /**
      * 解析 classpath 资源为文件系统绝对路径（Alipay SDK 需要）
+     * 兼容 JAR 内运行 —— 资源会复制到临时文件
      */
     private String resolveClasspath(String path) {
         if (path == null) return null;
         try {
             ClassPathResource resource = new ClassPathResource(path);
-            File file = resource.getFile();
-            return file.getAbsolutePath();
+            try {
+                // 优先尝试直接文件（IDE 开发模式）
+                File file = resource.getFile();
+                return file.getAbsolutePath();
+            } catch (IOException e) {
+                // JAR 内运行，复制到临时文件
+                String suffix = path.contains(".") ? path.substring(path.lastIndexOf('.')) : ".tmp";
+                java.io.File tempFile = java.io.File.createTempFile("alipay-cert-", suffix);
+                tempFile.deleteOnExit();
+                try (java.io.InputStream is = resource.getInputStream();
+                     java.io.FileOutputStream os = new java.io.FileOutputStream(tempFile)) {
+                    is.transferTo(os);
+                }
+                log.info("证书从 classpath 复制到临时文件: {} -> {}", path, tempFile.getAbsolutePath());
+                return tempFile.getAbsolutePath();
+            }
         } catch (IOException e) {
             log.error("解析证书路径失败: {}", path, e);
             return path; // fallback

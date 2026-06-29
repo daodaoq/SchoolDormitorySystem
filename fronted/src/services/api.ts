@@ -149,7 +149,9 @@ export const askAiStream = (
   callbacks: {
     onChunk: (text: string) => void;
     onDone: (info: { status: string; source?: string; totalLength?: number; citations?: Array<{
-      docTitle: string; content: string; score: number; docId: number;
+      markerId?: number; chunkId?: string; docTitle: string; content?: string;
+      score: number; docId: number; chunkIndex?: number;
+      confidence?: 'HIGH' | 'LOW'; referenced?: boolean;
     }> }) => void;
     onError: (error: string) => void;
   },

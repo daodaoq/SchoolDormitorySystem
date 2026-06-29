@@ -6,7 +6,9 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.java.backed.ai.circuit.ModelHealthMonitor;
 import org.java.backed.ai.config.AiProperties;
+import org.java.backed.ai.dto.CitationItem;
 import org.java.backed.ai.exception.AiServiceException;
+import org.java.backed.ai.kb.CitationParser;
 import org.java.backed.ai.kb.ConversationContextManager;
 import org.java.backed.ai.kb.IntentRouter;
 import org.java.backed.ai.kb.MilvusVectorStoreService;
@@ -54,6 +56,7 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
     private final SemanticCacheService semanticCache;
     private final IntentRouter intentRouter;
     private final ResponseLevelRouter levelRouter;
+    private final CitationParser citationParser;
 
     public AiQaServiceImpl(StringRedisTemplate stringRedisTemplate,
                            ChatClient.Builder chatClientBuilder,
@@ -66,7 +69,8 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
                            QueryRewriteService queryRewriteService,
                            SemanticCacheService semanticCache,
                            IntentRouter intentRouter,
-                           ResponseLevelRouter levelRouter) {
+                           ResponseLevelRouter levelRouter,
+                           CitationParser citationParser) {
         this.stringRedisTemplate = stringRedisTemplate;
         this.chatClientBuilder = chatClientBuilder;
         this.aiProperties = aiProperties;
@@ -79,6 +83,7 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
         this.semanticCache = semanticCache;
         this.intentRouter = intentRouter;
         this.levelRouter = levelRouter;
+        this.citationParser = citationParser;
     }
 
     // ==================== 同步问答 ====================
@@ -144,7 +149,7 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
             }
             fullPrompt.append("【用户问题】\n").append(question);
             if (!ragContext.isEmpty()) {
-                fullPrompt.append("\n请基于以上参考内容和对话历史，用中文简洁回答用户问题。");
+                fullPrompt.append("\n请基于以上参考内容和对话历史，用中文简洁回答用户问题。回答中务必使用[N]标记引用参考内容。");
             }
 
             aiAnswer = chatClientBuilder.build()
@@ -155,11 +160,24 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
                     .content();
 
             // 4d. 保存本轮对话到上下文管理器
+            // 解析行内引用，生成增强的溯源引用列表
+            List<CitationItem> enrichedCitations = citationParser.parse(
+                    aiAnswer, lastCitationItems.get());
+
             contextManager.addAndCompact(userId, question, aiAnswer);
 
             responseTime = (int) (System.currentTimeMillis() - startTime);
             healthMonitor.markSuccess(MODEL_NAME);
-            log.info("AI 调用成功: userId={}, responseTime={}ms", userId, responseTime);
+            log.info("AI 调用成功: userId={}, responseTime={}ms, 引用数={}",
+                    userId, responseTime, enrichedCitations.size());
+
+            // 保存日志（含引用来源 JSON）
+            saveLogWithCitations(userId, question, aiAnswer, "AI", responseTime, enrichedCitations);
+
+            // 返回含增强引用的结果
+            Map<String, Object> result = buildResult(question, aiAnswer, "AI", 0.85, responseTime);
+            result.put("citations", CitationParser.toMapList(enrichedCitations));
+            return result;
 
         } catch (AiServiceException e) {
             log.warn("AI 服务异常: code={}, msg={}", e.getErrorCode(), e.getMessage());
@@ -188,15 +206,10 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
             saveLog(userId, question, errorMsg, "ERROR", responseTime);
             return buildResult(question, errorMsg, "ERROR", 0, responseTime);
         }
-
-        // 6. 语义缓存 & 记录（缓存失败不影响主流程）
-        try { semanticCache.store(question, aiAnswer, "AI"); }
-        catch (Exception e) { log.warn("语义缓存存储失败: {}", e.getMessage()); }
-        saveLog(userId, question, aiAnswer, "AI", responseTime);
-        Map<String, Object> result = buildResult(question, aiAnswer, "AI", 0.85, responseTime);
-        // 附带引用来源
-        result.put("citations", getLastCitations());
-        return result;
+        // 理论上不可达（try 块中已返回或 aiAnswer==null），编译器需要
+        String fallbackMsg = "AI 服务暂时不可用，请稍后再试。";
+        saveLog(userId, question, fallbackMsg, "ERROR", responseTime);
+        return buildResult(question, fallbackMsg, "ERROR", 0, responseTime);
     }
 
     // ==================== 流式问答 ====================
@@ -261,19 +274,21 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
         // 4. 构建 RAG 上下文和对话历史
         String ragContext = "";
         List<Map<String, Object>> citations = Collections.emptyList();
+        List<CitationItem> rawCitationItems = Collections.emptyList();
         try {
             List<String> queries = queryRewriteService.rewrite(question);
             ragContext = buildRagContextMulti(queries);
             citations = getLastCitationsSnapshot();
+            rawCitationItems = getLastCitationItems();
         } catch (Exception e) {
             log.debug("RAG 上下文构建跳过: {}", e.getMessage());
         }
         String conversationContext = contextManager.getContext(userId);
 
-        // 5. 创建流式响应（带完整上下文 + 引用来源）
+        // 5. 创建流式响应（带完整上下文 + 引用来源 + 原始 CitationItem 用于解析）
         String systemPrompt = intentRouter.route(question, aiProperties.getPrompt().getSystemText());
         StreamingResponseHandler.StreamRequest streamRequest = new StreamingResponseHandler.StreamRequest(
-                question, systemPrompt, MODEL_NAME, ragContext, conversationContext, citations);
+                question, systemPrompt, MODEL_NAME, ragContext, conversationContext, citations, rawCitationItems);
         SseEmitter emitter = streamingHandler.createStreamEmitter(streamRequest);
 
         // 6. 流完成后保存日志 & 更新对话上下文
@@ -326,16 +341,18 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
 
     // ==================== RAG 检索 ====================
 
-    /** 存放最近一次检索的引用来源，供 buildRagContext 填充后返回给调用方 */
+    /** 存放最近一次检索的引用来源（Map 格式），供 buildRagContext 填充后返回给调用方 */
     private final ThreadLocal<List<Map<String, Object>>> lastCitations = new ThreadLocal<>();
 
+    /** 存放最近一次检索的引用来源（CitationItem 结构化格式），用于 CitationParser */
+    private final ThreadLocal<List<CitationItem>> lastCitationItems = new ThreadLocal<>();
+
     /**
-     * 获取最近一次 RAG 检索的引用来源（精简版，用于 SSE done 事件）
+     * 获取最近一次 RAG 检索的引用来源（含新字段，用于 SSE done 事件）
      */
     public List<Map<String, Object>> getLastCitationsSnapshot() {
         var c = lastCitations.get();
         if (c == null || c.isEmpty()) return Collections.emptyList();
-        // 返回精简版（去掉 content 字段中的长文本，前端只需 docTitle + score）
         List<Map<String, Object>> snapshot = new ArrayList<>();
         for (var item : c) {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -343,6 +360,8 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
             m.put("score", item.get("score"));
             m.put("docId", item.get("docId"));
             m.put("content", item.get("content"));
+            m.put("chunkId", item.getOrDefault("chunkId", ""));
+            m.put("chunkIndex", item.getOrDefault("chunkIndex", 0));
             snapshot.add(m);
         }
         return snapshot;
@@ -379,6 +398,7 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
         try {
             if (results.isEmpty()) {
                 lastCitations.set(Collections.emptyList());
+                lastCitationItems.set(Collections.emptyList());
                 return "";
             }
 
@@ -386,6 +406,7 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
             results = rerankService.rerank(query, results);
             if (results == null || results.isEmpty()) {
                 lastCitations.set(Collections.emptyList());
+                lastCitationItems.set(Collections.emptyList());
                 return "";
             }
 
@@ -395,21 +416,30 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
                     .toList();
             lastCitations.set(citations);
 
+            // 同时存储结构化 CitationItem 列表
+            lastCitationItems.set(CitationParser.fromMapList(citations));
+
             if (citations.isEmpty()) return "";
 
-            // 构建纯参考上下文（不带引用格式指令）
+            // 构建参考上下文（含段落信息）
             StringBuilder ctx = new StringBuilder();
             ctx.append("【参考知识库内容】\n");
             for (int i = 0; i < citations.size(); i++) {
                 var c = citations.get(i);
                 ctx.append("[").append(i + 1).append("] ")
-                        .append("《").append(c.get("docTitle")).append("》")
-                        .append(": ").append(c.get("content")).append("\n");
+                        .append("《").append(c.get("docTitle")).append("》");
+                // 包含段落位置信息
+                Object chunkIdx = c.get("chunkIndex");
+                if (chunkIdx != null) {
+                    ctx.append("(第").append(((Number) chunkIdx).intValue() + 1).append("段)");
+                }
+                ctx.append(": ").append(c.get("content")).append("\n");
             }
             return ctx.toString();
         } catch (Exception e) {
             log.warn("RAG 检索/Rerank 失败（不影响主流程）: {}", e.getMessage());
             lastCitations.set(Collections.emptyList());
+            lastCitationItems.set(Collections.emptyList());
             return "";
         }
     }
@@ -423,6 +453,7 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
             var results = kbDocumentService.search(question, 10);
             if (results == null || results.isEmpty()) {
                 lastCitations.set(Collections.emptyList());
+                lastCitationItems.set(Collections.emptyList());
                 return "";
             }
 
@@ -430,6 +461,7 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
             results = rerankService.rerank(question, results);
             if (results == null || results.isEmpty()) {
                 lastCitations.set(Collections.emptyList());
+                lastCitationItems.set(Collections.emptyList());
                 return "";
             }
 
@@ -438,22 +470,28 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
                     .filter(r -> (double) r.getOrDefault("score", 0.0) > 0.3)
                     .toList();
             lastCitations.set(citations);
+            lastCitationItems.set(CitationParser.fromMapList(citations));
 
             if (citations.isEmpty()) return "";
 
-            // 构建纯参考上下文（不带引用格式指令）
+            // 构建参考上下文（含段落信息）
             StringBuilder ctx = new StringBuilder();
             ctx.append("【参考知识库内容】\n");
             for (int i = 0; i < citations.size(); i++) {
                 var c = citations.get(i);
                 ctx.append("[").append(i + 1).append("] ")
-                        .append("《").append(c.get("docTitle")).append("》")
-                        .append(": ").append(c.get("content")).append("\n");
+                        .append("《").append(c.get("docTitle")).append("》");
+                Object chunkIdx = c.get("chunkIndex");
+                if (chunkIdx != null) {
+                    ctx.append("(第").append(((Number) chunkIdx).intValue() + 1).append("段)");
+                }
+                ctx.append(": ").append(c.get("content")).append("\n");
             }
             return ctx.toString();
         } catch (Exception e) {
             log.warn("RAG 检索/Rerank 失败（不影响主流程）: {}", e.getMessage());
             lastCitations.set(Collections.emptyList());
+            lastCitationItems.set(Collections.emptyList());
             return "";
         }
     }
@@ -464,6 +502,41 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
     public List<Map<String, Object>> getLastCitations() {
         var c = lastCitations.get();
         return c != null ? c : Collections.emptyList();
+    }
+
+    /**
+     * 获取最近一次 RAG 检索的引用来源（CitationItem 结构化格式）
+     */
+    public List<CitationItem> getLastCitationItems() {
+        var c = lastCitationItems.get();
+        return c != null ? c : Collections.emptyList();
+    }
+
+    private void saveLogWithCitations(String userId, String question, String answer,
+                                       String source, int responseTime, List<CitationItem> citations) {
+        try {
+            AiQaLog log = new AiQaLog();
+            log.setUserId(userId);
+            log.setQuestion(question);
+            log.setAnswer(answer);
+            log.setSource(source);
+            log.setResponseTime(responseTime);
+            if (citations != null && !citations.isEmpty()) {
+                log.setCitations(toJson(citations));
+            }
+            save(log);
+        } catch (Exception e) {
+            log.error("保存 AI 问答日志失败", e);
+        }
+    }
+
+    private String toJson(List<CitationItem> citations) {
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            return mapper.writeValueAsString(CitationParser.toMapList(citations));
+        } catch (Exception e) {
+            return "[]";
+        }
     }
 
     // ==================== 限流 ====================

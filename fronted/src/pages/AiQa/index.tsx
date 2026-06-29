@@ -4,10 +4,11 @@ import { RobotOutlined, UserOutlined, PlusOutlined, DeleteOutlined, MessageOutli
 import { ArrowUp, Square } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import { askAiStream } from '../../services/api';
-import { useChatHistory, type Conversation } from '../../hooks/useChatHistory';
-import { useAuth } from '../../contexts/AuthContext';
-import type { Message } from '../../hooks/useChatHistory';
+import { useChatStore, type Conversation, type Message } from '../../stores/chatStore';
+import { useAuthStore } from '../../stores/authStore';
+import DocumentViewer from '../../components/DocumentViewer';
 import {
   PromptInput,
   PromptInputTextarea,
@@ -44,6 +45,36 @@ function normalizeMarkdown(text: string): string {
       return fixed;
     })
     .join('\n');
+}
+
+/**
+ * 将 AI 回答中的 [N] 引用标记转为可点击的 HTML sup 标签
+ * 注意：[N] 在 markdown 中可能被误解为链接引用，需预处理
+ */
+function injectCitationMarkers(markdown: string): string {
+  // 保护代码块内的 [N]：先提取代码块，替换后还原
+  const codeBlocks: string[] = [];
+  let protected_ = markdown.replace(/```[\s\S]*?```/g, (match) => {
+    codeBlocks.push(match);
+    return `%%CODEBLOCK_${codeBlocks.length - 1}%%`;
+  });
+  protected_ = protected_.replace(/`[^`]*`/g, (match) => {
+    codeBlocks.push(match);
+    return `%%CODEBLOCK_${codeBlocks.length - 1}%%`;
+  });
+
+  // 将 [1] [1,3] [1,2,3] 转为 HTML sup 标签
+  protected_ = protected_.replace(
+    /\[(\d+(?:,\d+)*)\]/g,
+    '<sup class="citation-ref" data-refs="$1">[$1]</sup>'
+  );
+
+  // 还原代码块
+  protected_ = protected_.replace(/%%CODEBLOCK_(\d+)%%/g, (_m, idx) => {
+    return codeBlocks[parseInt(idx)] || '';
+  });
+
+  return protected_;
 }
 
 function formatTime(ts: number): string {
@@ -111,22 +142,89 @@ const markdownComponents: Record<string, React.FC<any>> = {
   ),
 };
 
+/** 创建带溯源点击功能的 markdownComponents */
+function createMarkdownComponents(
+  citations: any[],
+  onCitationClick: (docId: number, docTitle: string, chunkId: string, chunkIndex: number) => void,
+) {
+  return {
+    ...markdownComponents,
+    sup: ({ children, node, ...props }: any) => {
+      // 检查是否是引用标记
+      const className = props.className || '';
+      const dataRefs = props['data-refs'] || '';
+      if (className.includes('citation-ref') && dataRefs) {
+        const markerIds = dataRefs.split(',').map(Number);
+        // 找到第一个匹配的 citation
+        const firstMarkerId = markerIds[0];
+        const citation = citations?.find((c: any) => c.markerId === firstMarkerId);
+        const docId = citation?.docId;
+        const docTitle = citation?.docTitle || '';
+        const chunkId = citation?.chunkId || '';
+        const chunkIndex = citation?.chunkIndex ?? 0;
+
+        return (
+          <sup
+            onClick={(e) => {
+              e.stopPropagation();
+              if (docId) {
+                onCitationClick(docId, docTitle, chunkId, chunkIndex);
+              }
+            }}
+            style={{
+              cursor: docId ? 'pointer' : 'default',
+              color: '#E85D4E',
+              fontWeight: 700,
+              fontSize: '0.75em',
+              textDecoration: 'none',
+              padding: '0 1px',
+              transition: 'all 0.15s',
+            }}
+            title={docId ? `查看来源: ${docTitle}` : undefined}
+            onMouseEnter={(e) => {
+              if (docId) {
+                e.currentTarget.style.background = 'rgba(232,93,78,0.12)';
+                e.currentTarget.style.borderRadius = '3px';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            {children}
+          </sup>
+        );
+      }
+      return <sup {...props}>{children}</sup>;
+    },
+  };
+}
+
 // ==================== 组件主体 ====================
 
 const AiQa: React.FC = () => {
-  const { user } = useAuth();
+  const user = useAuthStore((s) => s.user);
   const userId = user?.username || 'anonymous';
 
-  const {
-    conversations,
-    activeId,
-    messages,
-    newConversation,
-    switchConversation,
-    deleteConversation,
-    addUserMessage,
-    addAssistantMessage,
-  } = useChatHistory(userId);
+  // chat store
+  const conversations = useChatStore((s) => s.conversations);
+  const activeId = useChatStore((s) => s.activeId);
+  const setUserId = useChatStore((s) => s.setUserId);
+  const newConversation = useChatStore((s) => s.newConversation);
+  const switchConversation = useChatStore((s) => s.switchConversation);
+  const deleteConversation = useChatStore((s) => s.deleteConversation);
+  const addUserMessage = useChatStore((s) => s.addUserMessage);
+  const addAssistantMessage = useChatStore((s) => s.addAssistantMessage);
+  // messages is a function in the store, compute it
+  const messages = useChatStore((s) => {
+    const conv = s.conversations.find((c) => c.id === s.activeId);
+    return conv?.messages || [];
+  });
+
+  // sync userId on mount/change
+  useEffect(() => {
+    setUserId(userId);
+  }, [userId, setUserId]);
 
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -136,6 +234,21 @@ const AiQa: React.FC = () => {
   const abortRef = useRef<AbortController | null>(null);
   const streamBufferRef = useRef('');
   const doneHandledRef = useRef(false);
+
+  // 文档查看器状态
+  const [docViewerVisible, setDocViewerVisible] = useState(false);
+  const [viewingDocId, setViewingDocId] = useState<number>(0);
+  const [viewingDocTitle, setViewingDocTitle] = useState<string>('');
+  const [viewingChunkId, setViewingChunkId] = useState<string>('');
+  const [viewingChunkIndex, setViewingChunkIndex] = useState<number>(0);
+
+  const handleViewDocument = useCallback((docId: number, docTitle: string, chunkId?: string, chunkIndex?: number) => {
+    setViewingDocId(docId);
+    setViewingDocTitle(docTitle);
+    setViewingChunkId(chunkId || '');
+    setViewingChunkIndex(chunkIndex ?? 0);
+    setDocViewerVisible(true);
+  }, []);
 
   // 如果没有任何对话，自动创建一个
   useEffect(() => {
@@ -246,7 +359,7 @@ const AiQa: React.FC = () => {
         <div ref={listRef} style={{ flex: 1, overflow: 'auto', padding: '24px 24px 12px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             {messages.map((msg, idx) => (
-              <MessageBubble key={idx} msg={msg} />
+              <MessageBubble key={idx} msg={msg} onCitationClick={handleViewDocument} />
             ))}
 
             {loading && streamingText && <StreamingBubble content={streamingText} />}
@@ -451,14 +564,35 @@ const AiQa: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {/* 文档查看器 */}
+      <DocumentViewer
+        docId={viewingDocId}
+        docTitle={viewingDocTitle}
+        highlightChunkId={viewingChunkId}
+        highlightChunkIndex={viewingChunkIndex}
+        visible={docViewerVisible}
+        onClose={() => setDocViewerVisible(false)}
+      />
     </div>
   );
 };
 
 // ==================== 子组件 ====================
 
-const MessageBubble: React.FC<{ msg: Message }> = ({ msg }) => {
+const MessageBubble: React.FC<{
+  msg: Message;
+  onCitationClick: (docId: number, docTitle: string, chunkId: string, chunkIndex: number) => void;
+}> = ({ msg, onCitationClick }) => {
   const isUser = msg.role === 'user';
+  const citations = msg.citations || [];
+  // 筛选：优先显示被引用的（HIGH），如果没有被引用的则显示全部
+  const referencedCitations = citations.filter((c) => c.referenced || c.confidence === 'HIGH');
+  const displayCitations = referencedCitations.length > 0 ? referencedCitations : citations;
+  const dynamicComponents = createMarkdownComponents(citations, onCitationClick);
+  // 预处理文本：将 [N] 转为可点击的 HTML sup 标签
+  const processedContent = isUser ? msg.content : injectCitationMarkers(normalizeMarkdown(msg.content));
+
   return (
     <div style={{ display: 'flex', gap: 10, flexDirection: isUser ? 'row-reverse' : 'row' }}>
       <div style={{
@@ -485,8 +619,12 @@ const MessageBubble: React.FC<{ msg: Message }> = ({ msg }) => {
             <span style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</span>
           ) : (
             <div className="markdown-body" style={{ fontSize: 'inherit' }}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                {normalizeMarkdown(msg.content)}
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeRaw]}
+                components={dynamicComponents}
+              >
+                {processedContent}
               </ReactMarkdown>
             </div>
           )}
@@ -500,28 +638,75 @@ const MessageBubble: React.FC<{ msg: Message }> = ({ msg }) => {
           </Tag>
         )}
 
-        {msg.citations && msg.citations.length > 0 && (
+        {displayCitations.length > 0 && (
           <div style={{
             marginTop: 8, padding: '10px 14px', borderRadius: 14,
-            background: '#F8F6F0', border: '1px solid rgba(26,26,26,0.06)', maxWidth: 380,
+            background: '#F8F6F0', border: '1px solid rgba(26,26,26,0.06)', maxWidth: 400,
           }}>
             <div style={{
               fontSize: 11, fontWeight: 600, color: 'rgba(26,26,26,0.35)',
               marginBottom: 6, letterSpacing: '0.04em', textTransform: 'uppercase',
             }}>
               📚 参考来源
-            </div>
-            {msg.citations.map((c, i) => (
-              <div key={i} style={{
-                fontSize: 12, color: 'rgba(26,26,26,0.55)', lineHeight: 1.5,
-                padding: '4px 0',
-                borderBottom: i < msg.citations!.length - 1 ? '1px solid rgba(26,26,26,0.04)' : 'none',
-              }}>
-                <span style={{ fontWeight: 600, color: '#E85D4E' }}>[{i + 1}]</span>
-                {' '}《{c.docTitle}》
-                <span style={{ fontSize: 10, color: 'rgba(26,26,26,0.25)' }}>
-                  {' '}相关度 {(c.score as number).toFixed(2)}
+              {referencedCitations.length > 0 && (
+                <span style={{ fontWeight: 400, textTransform: 'none', marginLeft: 4 }}>
+                  （{referencedCitations.length}/{citations.length} 被引用）
                 </span>
+              )}
+            </div>
+            {displayCitations.map((c, i) => (
+              <div
+                key={i}
+                onClick={() => {
+                  if (c.docId) {
+                    onCitationClick(c.docId, c.docTitle, c.chunkId || '', c.chunkIndex ?? 0);
+                  }
+                }}
+                style={{
+                  fontSize: 12, color: 'rgba(26,26,26,0.55)', lineHeight: 1.5,
+                  padding: '5px 0', cursor: c.docId ? 'pointer' : 'default',
+                  borderBottom: i < displayCitations.length - 1 ? '1px solid rgba(26,26,26,0.04)' : 'none',
+                  transition: 'all 0.15s',
+                  borderRadius: 6,
+                  paddingLeft: 4,
+                  paddingRight: 4,
+                }}
+                onMouseEnter={(e) => {
+                  if (c.docId) {
+                    e.currentTarget.style.background = 'rgba(232,93,78,0.06)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: 600, color: '#E85D4E' }}>
+                    [{c.markerId || i + 1}]
+                  </span>
+                  <span style={{ fontWeight: 500 }}>《{c.docTitle}》</span>
+                  {c.chunkIndex !== undefined && c.chunkIndex >= 0 && (
+                    <span style={{
+                      fontSize: 10, color: 'rgba(26,26,26,0.30)',
+                      background: 'rgba(26,26,26,0.03)', padding: '0 6px', borderRadius: 9999,
+                    }}>
+                      第{c.chunkIndex + 1}段
+                    </span>
+                  )}
+                  <span style={{ fontSize: 10, color: 'rgba(26,26,26,0.30)' }}>
+                    相关度 {c.score.toFixed(2)}
+                  </span>
+                  {c.confidence === 'HIGH' && (
+                    <Tag color="green" style={{ margin: 0, fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>
+                      高置信
+                    </Tag>
+                  )}
+                  {c.confidence === 'LOW' && c.referenced === false && (
+                    <Tag color="default" style={{ margin: 0, fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>
+                      未引用
+                    </Tag>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -549,7 +734,11 @@ const StreamingBubble: React.FC<{ content: string }> = ({ content }) => (
         border: '1px solid rgba(26,26,26,0.08)', overflow: 'hidden',
       }}>
         <div className="markdown-body" style={{ fontSize: 'inherit' }}>
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw]}
+            components={markdownComponents}
+          >
             {normalizeMarkdown(content) || '*思考中…*'}
           </ReactMarkdown>
         </div>

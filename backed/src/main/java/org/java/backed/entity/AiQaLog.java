@@ -36,6 +36,9 @@ public class AiQaLog {
     /** Token 消耗量（估算） */
     private Integer tokenCount;
 
+    /** 引用来源列表（JSON 格式） */
+    private String citations;
+
     /** 创建时间 */
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

@@ -1,10 +1,15 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 
 interface Citation {
+  markerId?: number;       // 引用标记编号，对应回答中的 [N]
+  chunkId?: string;        // Milvus chunk_id，用于段落定位
   docTitle: string;
   content?: string;
   score: number;
   docId: number;
+  chunkIndex?: number;     // 段落序号（从0开始）
+  confidence?: 'HIGH' | 'LOW';  // 溯源置信度
+  referenced?: boolean;    // LLM 是否实际引用了此来源
 }
 
 export interface Message {

@@ -16,6 +16,7 @@ interface UserRecord {
 
 const roleMap: Record<string, string> = { ADMIN: '管理员', USER: '普通用户' };
 
+// useState === ref
 const Users: React.FC = () => {
   const [data, setData] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -114,3 +115,6 @@ const Users: React.FC = () => {
 };
 
 export default Users;
+
+// vue 一个组件一个文件
+// React 一个组件一个函数

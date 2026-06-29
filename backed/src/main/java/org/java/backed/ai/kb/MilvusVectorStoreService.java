@@ -42,6 +42,7 @@ public class MilvusVectorStoreService {
     private static final String FIELD_ID = "chunk_id";
     private static final String FIELD_DOC_ID = "doc_id";
     private static final String FIELD_CONTENT = "content";
+    private static final String FIELD_CHUNK_INDEX = "chunk_index";
     private static final String FIELD_EMBEDDING = "embedding";
 
     @Value("${milvus.host:localhost}")
@@ -107,6 +108,11 @@ public class MilvusVectorStoreService {
                     .withMaxLength(65535)
                     .build();
 
+            FieldType chunkIndexField = FieldType.newBuilder()
+                    .withName(FIELD_CHUNK_INDEX)
+                    .withDataType(DataType.Int32)
+                    .build();
+
             FieldType embeddingField = FieldType.newBuilder()
                     .withName(FIELD_EMBEDDING)
                     .withDataType(DataType.FloatVector)
@@ -119,6 +125,7 @@ public class MilvusVectorStoreService {
                     .addFieldType(idField)
                     .addFieldType(docIdField)
                     .addFieldType(contentField)
+                    .addFieldType(chunkIndexField)
                     .addFieldType(embeddingField)
                     .build();
 
@@ -164,6 +171,8 @@ public class MilvusVectorStoreService {
                     batch.stream().map(ChunkVector::docId).collect(Collectors.toList())));
             fields.add(new InsertParam.Field(FIELD_CONTENT,
                     batch.stream().map(ChunkVector::content).collect(Collectors.toList())));
+            fields.add(new InsertParam.Field(FIELD_CHUNK_INDEX,
+                    batch.stream().map(c -> c.chunkIndex()).collect(Collectors.toList())));
             fields.add(new InsertParam.Field(FIELD_EMBEDDING,
                     batch.stream().map(ChunkVector::embedding).collect(Collectors.toList())));
 
@@ -191,7 +200,7 @@ public class MilvusVectorStoreService {
     public List<SearchResult> search(float[] queryVector, int topK) {
         if (client == null) return Collections.emptyList();
 
-        List<String> outFields = List.of(FIELD_DOC_ID, FIELD_CONTENT);
+        List<String> outFields = List.of(FIELD_DOC_ID, FIELD_CONTENT, FIELD_CHUNK_INDEX);
 
         SearchParam searchParam = SearchParam.newBuilder()
                 .withCollectionName(COLLECTION_NAME)
@@ -216,11 +225,13 @@ public class MilvusVectorStoreService {
             SearchResultsWrapper.IDScore idScore = wrapper.getIDScore(0).get(i);
             String content = (String) wrapper.getFieldData(FIELD_CONTENT, 0).get(i);
             Long docId = (Long) wrapper.getFieldData(FIELD_DOC_ID, 0).get(i);
+            Integer chunkIndex = (Integer) wrapper.getFieldData(FIELD_CHUNK_INDEX, 0).get(i);
 
             results.add(new SearchResult(
                     idScore.getStrID(),
                     docId,
                     content,
+                    chunkIndex != null ? chunkIndex : 0,
                     idScore.getScore()
             ));
         }
@@ -260,10 +271,10 @@ public class MilvusVectorStoreService {
     /**
      * 待插入的向量数据
      */
-    public record ChunkVector(String chunkId, Long docId, String content, List<Float> embedding) {}
+    public record ChunkVector(String chunkId, Long docId, String content, int chunkIndex, List<Float> embedding) {}
 
     /**
      * 检索结果
      */
-    public record SearchResult(String chunkId, Long docId, String content, float score) {}
+    public record SearchResult(String chunkId, Long docId, String content, int chunkIndex, float score) {}
 }

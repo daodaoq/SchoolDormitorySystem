@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Row, Col, Descriptions, Tag, Statistic, Spin, Empty, Progress } from 'antd';
 import { HomeOutlined, PhoneOutlined, CalendarOutlined, CheckCircleOutlined, WarningOutlined } from '@ant-design/icons';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthStore } from '../../stores/authStore';
 import { getOverview, getStudentOverview } from '../../services/api';
 import type { DashboardOverview } from '../../types';
 
 const MyDormitory: React.FC = () => {
-  const { user } = useAuth();
+  const user = useAuthStore((s) => s.user);
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
   const [loading, setLoading] = useState(true);
 

@@ -22,6 +22,7 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
+// zustand === pinia
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<LoginResult | null>(null);
   const [token, setToken] = useState<string | null>(null);

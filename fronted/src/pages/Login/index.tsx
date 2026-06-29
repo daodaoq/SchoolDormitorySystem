@@ -2,14 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Form, Input, Button, Typography, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthStore } from '../../stores/authStore';
 import { loginApi } from '../../services/api';
 
 const { Title, Text } = Typography;
 
 const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
-  const { login, isAuthenticated } = useAuth();
+  const login = useAuthStore((s) => s.login);
+  const isAuthenticated = useAuthStore((s) => !!s.token);
   const navigate = useNavigate();
 
   useEffect(() => {

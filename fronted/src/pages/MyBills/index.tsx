@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, Table, Tag, Button, Spin, Empty, Statistic, Row, Col, message } from 'antd';
 import { DollarOutlined, ClockCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { getBills, createPaymentOrder } from '../../services/api';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthStore } from '../../stores/authStore';
 import type { PaymentBill } from '../../types';
 
 const statusMap: Record<string, { color: string; text: string }> = {
@@ -12,7 +12,7 @@ const statusMap: Record<string, { color: string; text: string }> = {
 };
 
 const MyBills: React.FC = () => {
-  const { user } = useAuth();
+  const user = useAuthStore((s) => s.user);
   const [bills, setBills] = useState<PaymentBill[]>([]);
   const [loading, setLoading] = useState(true);
   const [payingIds, setPayingIds] = useState<Set<number>>(new Set());

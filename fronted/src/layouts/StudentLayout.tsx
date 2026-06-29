@@ -3,8 +3,13 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Layout, Space, Avatar, Dropdown, Typography } from 'antd';
 import { LogoutOutlined, UserOutlined, IdcardOutlined } from '@ant-design/icons';
 import { Home, FileText, CreditCard, Bot, User } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuthStore } from '../stores/authStore';
 import { ExpandableTabs } from '@/components/ui/expandable-tabs';
+
+
+// 在JavaScript， TypeScript里面嵌入html
+// React 分为 类组件（官方不推荐） 和 函数式组件
+// React 有 19 个版本，18 版以前是类组件，18 版开始变成函数式组件
 
 const { Header, Content, Footer } = Layout;
 const { Text } = Typography;
@@ -36,7 +41,8 @@ const indexToPath: Record<number, string> = {
 const StudentLayout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
 
   const activeIndex = pathToIndex[location.pathname] ?? null;
 

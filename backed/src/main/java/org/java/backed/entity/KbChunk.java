@@ -18,6 +18,9 @@ public class KbChunk {
     /** 关联文档ID */
     private Long documentId;
 
+    /** Milvus chunk_id，用于交叉引用 */
+    private String chunkId;
+
     /** 分块序号(从0开始) */
     private Integer chunkIndex;
 

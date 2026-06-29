@@ -91,6 +91,7 @@ public class DocumentProcessingPipeline {
             for (int i = 0; i < chunkResults.size(); i++) {
                 KbChunk chunk = new KbChunk();
                 chunk.setDocumentId(documentId);
+                chunk.setChunkId(chunkResults.get(i).getChunkId());
                 chunk.setChunkIndex(chunkResults.get(i).getIndex());
                 chunk.setContent(chunkResults.get(i).getContent());
                 chunk.setTokenCount(estimateTokens(chunkResults.get(i).getContent()));
@@ -109,6 +110,7 @@ public class DocumentProcessingPipeline {
                         chunkResults.get(i).getChunkId(),
                         documentId,
                         chunkResults.get(i).getContent(),
+                        chunkResults.get(i).getIndex(),
                         asList(vectors.get(i))
                 ));
             }

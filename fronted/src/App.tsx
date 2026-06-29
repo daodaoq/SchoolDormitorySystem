@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { useAuthStore } from './stores/authStore';
 import BasicLayout from './layouts/BasicLayout';
 import StudentLayout from './layouts/StudentLayout';
 import Login from './pages/Login';
@@ -22,7 +22,8 @@ import MyBills from './pages/MyBills';
 import Profile from './pages/Profile';
 
 const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, initializing } = useAuth();
+  const isAuthenticated = useAuthStore((s) => !!s.token);
+const initializing = useAuthStore((s) => s.initializing);
 
   // 初始化阶段显示 loading，不跳转，避免闪跳 bug
   if (initializing) {
@@ -50,7 +51,7 @@ const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 /** 根据角色选择布局 */
 const LayoutSwitcher: React.FC = () => {
-  const { user } = useAuth();
+  const user = useAuthStore((s) => s.user);
   const isStudent = user?.role === 'STUDENT';
   return isStudent ? <StudentLayout /> : <BasicLayout />;
 };
@@ -87,17 +88,13 @@ function AppRoutes() {
 
 /** 登录后根据角色跳转 */
 const RoleHome: React.FC = () => {
-  const { user } = useAuth();
+  const user = useAuthStore((s) => s.user);
   if (user?.role === 'STUDENT') return <Navigate to="/my-dormitory" replace />;
   return <Navigate to="/dashboard" replace />;
 };
 
 function App() {
-  return (
-    <AuthProvider>
-      <AppRoutes />
-    </AuthProvider>
-  );
+  return <AppRoutes />;
 }
 
 export default App;

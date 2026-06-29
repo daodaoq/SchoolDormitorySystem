@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.java.backed.ai.config.AiProperties;
+import org.java.backed.ai.dto.CitationItem;
+import org.java.backed.ai.kb.CitationParser;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -26,6 +28,7 @@ public class StreamingResponseHandler {
 
     private final ChatClient.Builder chatClientBuilder;
     private final AiProperties aiProperties;
+    private final CitationParser citationParser;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -37,11 +40,13 @@ public class StreamingResponseHandler {
             String modelName,
             String ragContext,
             String conversationContext,
-            List<Map<String, Object>> citations
+            List<Map<String, Object>> citations,
+            List<CitationItem> rawCitationItems
     ) {
         public StreamRequest(String question, String systemPrompt, String modelName,
                              String ragContext, String conversationContext) {
-            this(question, systemPrompt, modelName, ragContext, conversationContext, Collections.emptyList());
+            this(question, systemPrompt, modelName, ragContext, conversationContext,
+                 Collections.emptyList(), Collections.emptyList());
         }
     }
 
@@ -89,7 +94,10 @@ public class StreamingResponseHandler {
                             })
                             .doOnComplete(() -> {
                                 log.info("AI 流式响应完成: streamId={}, 总长度={}", streamId, fullContent.length());
-                                sendDoneEvent(emitter, request.citations());
+                                // 用 CitationParser 解析行内引用标记，生成增强引用
+                                List<CitationItem> enrichedCitations = citationParser.parse(
+                                        fullContent.toString(), request.rawCitationItems());
+                                sendDoneEventWithEnrichedCitations(emitter, enrichedCitations, request.citations());
                                 emitter.complete();
                             })
                             .doOnError(error -> {
@@ -124,6 +132,27 @@ public class StreamingResponseHandler {
     }
 
     /**
+     * 发送 done 事件，包含增强的引用来源（行内引用解析后）
+     */
+    private void sendDoneEventWithEnrichedCitations(SseEmitter emitter, List<CitationItem> enrichedCitations,
+                                                     List<Map<String, Object>> fallbackCitations) {
+        Map<String, Object> doneData = new LinkedHashMap<>();
+        doneData.put("status", "completed");
+        List<Map<String, Object>> citationMaps = CitationParser.toMapList(enrichedCitations);
+        if (!citationMaps.isEmpty()) {
+            doneData.put("citations", citationMaps);
+        } else if (fallbackCitations != null && !fallbackCitations.isEmpty()) {
+            // 如果解析后为空但 RAG 有结果，使用原始引用（标记为未引用）
+            doneData.put("citations", fallbackCitations);
+        }
+        try {
+            sendEvent(emitter, "done", objectMapper.writeValueAsString(doneData));
+        } catch (JsonProcessingException e) {
+            sendEvent(emitter, "done", "{\"status\":\"completed\"}");
+        }
+    }
+
+    /**
      * 发送 done 事件，包含引用来源
      */
     private void sendDoneEvent(SseEmitter emitter, List<Map<String, Object>> citations) {
@@ -155,17 +184,17 @@ public class StreamingResponseHandler {
         prompt.append("【用户问题】\n").append(request.question());
 
         if (!request.ragContext().isEmpty()) {
-            prompt.append("\n请基于以上参考内容和对话历史，用中文简洁回答用户问题。");
+            prompt.append("\n请基于以上参考内容和对话历史，用中文简洁回答用户问题。回答中务必使用[N]标记引用参考内容。");
         }
 
         return prompt.toString();
     }
 
     /**
-     * 增强系统提示词，追加简洁的 Markdown 格式要求
+     * 增强系统提示词，追加 Markdown 格式要求 + 引用格式要求
      */
     private String enhanceSystemPrompt(String basePrompt) {
-        String markdownInstruction = """
+        String instruction = """
 
                 【回答格式要求 — 必须严格遵守】
                 使用 Markdown 组织回答，注意：所有标记符后面必须有一个空格！
@@ -174,8 +203,14 @@ public class StreamingResponseHandler {
                 - 无序列表：「- 项目」（减号后必须有空格）
                 - 粗体：「**关键词**」（双星号包裹，前后不留空格）
                 - 引用块：「> 引用文字」（> 后必须有空格）
-                - 保持简洁清晰，不要使用表格""";
-        return basePrompt + markdownInstruction;
+                - 保持简洁清晰，不要使用表格
+
+                【引用格式要求 — 必须严格遵守】
+                - 当你的回答参考了知识库内容时，必须在引用处标注来源编号
+                - 格式：直接在被引用的句子后面紧接[N]标记
+                - 例如："根据规定，住宿费为1200元/学期[1]。缴费可通过支付宝完成[2]。"
+                - 不要在[N]和前面的文字之间加空格""";
+        return basePrompt + instruction;
     }
 
     /**

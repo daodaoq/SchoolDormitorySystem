@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Layout, Avatar, Dropdown, Typography } from 'antd';
 import * as Icons from '@ant-design/icons';
 import { LogoutOutlined, UserOutlined, RightOutlined, DownOutlined, IdcardOutlined } from '@ant-design/icons';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuthStore } from '../stores/authStore';
 import type { MenuItem } from '../types';
 
 const { Content } = Layout;
@@ -28,7 +28,9 @@ function isMenuActive(menu: MenuItem, pathname: string): boolean {
 const BasicLayout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, menus, logout } = useAuth();
+  const user = useAuthStore((s) => s.user);
+  const menus = useAuthStore((s) => s.menus);
+  const logout = useAuthStore((s) => s.logout);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   // 过滤出一级菜单

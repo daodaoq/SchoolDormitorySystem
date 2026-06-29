@@ -8,6 +8,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.java.backed.ai.kb.EmbeddingService;
 import org.java.backed.ai.kb.MilvusVectorStoreService;
 import org.java.backed.config.RabbitMQConfig;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.java.backed.entity.KbChunk;
 import org.java.backed.entity.KbDocument;
 import org.java.backed.mapper.KbChunkMapper;
@@ -59,11 +61,17 @@ public class KbDocumentServiceImpl extends ServiceImpl<KbDocumentMapper, KbDocum
         doc.setStatus("PENDING");
         save(doc);
 
-        // 3. 通过 RabbitMQ 异步触发处理流水线
-        rabbitTemplate.convertAndSend(
-                RabbitMQConfig.EXCHANGE_KB_DOCUMENT,
-                RabbitMQConfig.RK_KB_DOCUMENT_PROCESS,
-                String.valueOf(doc.getId()));
+        // 3. 事务提交后再通过 RabbitMQ 异步触发处理流水线（避免消费者读到未提交数据）
+        final Long docId = doc.getId();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                rabbitTemplate.convertAndSend(
+                        RabbitMQConfig.EXCHANGE_KB_DOCUMENT,
+                        RabbitMQConfig.RK_KB_DOCUMENT_PROCESS,
+                        String.valueOf(docId));
+            }
+        });
 
         log.info("知识库文档上传成功: id={}, fileName={}", doc.getId(), doc.getFileName());
         return doc;
@@ -85,8 +93,12 @@ public class KbDocumentServiceImpl extends ServiceImpl<KbDocumentMapper, KbDocum
         // 1. 删除 MySQL 中的 chunks
         chunkMapper.deleteByDocumentId(id);
 
-        // 2. 删除 Milvus 中的向量
-        milvusService.deleteByDocId(id);
+        // 2. 删除 Milvus 中的向量（失败不阻塞删除流程）
+        try {
+            milvusService.deleteByDocId(id);
+        } catch (Exception e) {
+            log.warn("Milvus 向量删除失败（忽略，可能 Collection 已重建）: id={}, err={}", id, e.getMessage());
+        }
 
         // 3. 删除 MinIO 文件
         try {
@@ -156,6 +168,7 @@ public class KbDocumentServiceImpl extends ServiceImpl<KbDocumentMapper, KbDocum
                 item.put("docId", r.docId());
                 item.put("docTitle", docTitles.getOrDefault(r.docId(), "未知文档"));
                 item.put("content", r.content());
+                item.put("chunkIndex", r.chunkIndex());
                 item.put("score", Math.round(r.score() * 10000.0) / 10000.0);
                 output.add(item);
             }

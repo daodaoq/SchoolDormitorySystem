@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Descriptions, Spin, Tag, Avatar } from 'antd';
 import { UserOutlined } from '@ant-design/icons';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthStore } from '../../stores/authStore';
 import { getCurrentUser } from '../../services/api';
 
 const roleColorMap: Record<string, string> = {
@@ -17,7 +17,7 @@ const roleLabelMap: Record<string, string> = {
 };
 
 const Profile: React.FC = () => {
-  const { user } = useAuth();
+  const user = useAuthStore((s) => s.user);
   const [detail, setDetail] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
