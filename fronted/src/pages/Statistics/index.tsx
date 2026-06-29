@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Select, Table, Spin, Statistic } from 'antd';
+import { Card, Row, Col, Select, Table, Spin, Statistic, Tag } from 'antd';
 import ReactECharts from 'echarts-for-react';
 import { getCollectionRate, getArrears } from '../../services/api';
 
 const cardStyle = { borderRadius: 12, border: '1px solid #f0f0f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' };
+
+const arrearsStatusMap: Record<string, { color: string; text: string }> = {
+  UNPAID: { color: 'orange', text: '未缴' },
+  OVERDUE: { color: 'red', text: '逾期' },
+};
 
 const Statistics: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -22,7 +27,7 @@ const Statistics: React.FC = () => {
       ]);
       setCollectionData(rateRes.data || []);
       setArrears(arrearsRes.data || {});
-    } catch { /* handled */ }
+    } catch { message.error('加载统计数据失败'); }
     setLoading(false);
   };
 
@@ -39,13 +44,24 @@ const Statistics: React.FC = () => {
   const columns = [
     { title: '学号', dataIndex: 'studentNo' }, { title: '姓名', dataIndex: 'studentName' },
     { title: '宿舍号', dataIndex: 'dormitoryNo' }, { title: '欠费金额', dataIndex: 'arrears' },
-    { title: '截止日期', dataIndex: 'dueDate' }, { title: '状态', dataIndex: 'status' },
+    { title: '截止日期', dataIndex: 'dueDate' }, { title: '状态', dataIndex: 'status', render: (s: string) => {
+      const m = arrearsStatusMap[s] || { color: 'default', text: s };
+      return <Tag color={m.color}>{m.text}</Tag>;
+    } },
   ];
 
   return (
     <div style={{ padding: 24 }}>
-      <Select placeholder="选择学期" allowClear style={{ width: 150, marginBottom: 16 }} value={semester || undefined} onChange={(v) => setSemester(v || '')}>
-        <Select.Option value="2024-1">2024年第1学期</Select.Option><Select.Option value="2024-2">2024年第2学期</Select.Option>
+      <Select placeholder="选择学期" allowClear style={{ width: 160, marginBottom: 16 }} value={semester || undefined} onChange={(v) => setSemester(v || '')}>
+        {(() => {
+          const currentYear = new Date().getFullYear();
+          const options = [];
+          for (let y = currentYear; y >= currentYear - 3; y--) {
+            options.push(<Select.Option key={`${y}-1`} value={`${y}-1`}>{y}年第1学期</Select.Option>);
+            options.push(<Select.Option key={`${y}-2`} value={`${y}-2`}>{y}年第2学期</Select.Option>);
+          }
+          return options;
+        })()}
       </Select>
       <Row gutter={[16, 16]}>
         <Col span={6}><Card style={cardStyle}><Statistic title="欠费总人数" value={arrears.totalCount || 0} /></Card></Col>

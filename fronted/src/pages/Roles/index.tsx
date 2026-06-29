@@ -28,7 +28,7 @@ const Roles: React.FC = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    try { const res = await getRoles(); setData(res.data); } catch { /* handled */ }
+    try { const res = await getRoles(); setData(res.data); } catch { message.error('加载角色数据失败'); }
     setLoading(false);
   };
 
@@ -41,7 +41,7 @@ const Roles: React.FC = () => {
       if (editingId) { await updateRole(editingId, values); message.success('更新成功'); }
       else { await addRole(values); message.success('添加成功'); }
       setModalVisible(false); fetchData();
-    } catch { /* handled */ }
+    } catch (e: any) { if (!e?.errorFields) message.error('操作失败，请稍后重试'); }
   };
 
   const openPermission = async (roleId: number) => {
@@ -50,7 +50,7 @@ const Roles: React.FC = () => {
       const res = await getRoleMenus(roleId);
       setMenuTree(res.data.menus);
       setCheckedKeys(res.data.checkedKeys);
-    } catch { /* handled */ }
+    } catch { message.error('加载权限失败'); }
     setPermVisible(true);
   };
 
@@ -85,7 +85,7 @@ const Roles: React.FC = () => {
       <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} style={{ marginBottom: 16 }}>新增角色</Button>
       <Table rowKey="id" columns={columns} dataSource={data} loading={loading} pagination={false} />
 
-      <Modal title={editingId ? '编辑角色' : '新增角色'} open={modalVisible} onOk={handleSubmit} onCancel={() => setModalVisible(false)}>
+      <Modal title={editingId ? '编辑角色' : '新增角色'} open={modalVisible} onOk={handleSubmit} onCancel={() => setModalVisible(false)} okText="确定" cancelText="取消">
         <Alert variant="warning" appearance="light" size="sm" className="mb-4">
           <AlertIcon><AlertTriangle className="size-3.5" /></AlertIcon>
           <AlertTitle>带 * 的字段为必填项，请完整填写后提交</AlertTitle>
@@ -97,7 +97,7 @@ const Roles: React.FC = () => {
         </Form>
       </Modal>
 
-      <Modal title="分配权限" open={permVisible} onOk={handleAssign} onCancel={() => setPermVisible(false)} width={500}>
+      <Modal title="分配权限" open={permVisible} onOk={handleAssign} onCancel={() => setPermVisible(false)} okText="确定" cancelText="取消" width={500}>
         <Tree
           checkable defaultExpandAll
           fieldNames={{ title: 'menuName', key: 'id', children: 'children' }}

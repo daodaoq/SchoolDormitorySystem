@@ -155,10 +155,10 @@ const Profile: React.FC = () => {
             </Tag>
           </Descriptions.Item>
           <Descriptions.Item label="创建时间">
-            {displayUser?.createTime || '—'}
+            {displayUser?.createTime ? displayUser.createTime.replace('T', ' ') : '—'}
           </Descriptions.Item>
           <Descriptions.Item label="上次更新">
-            {displayUser?.updateTime || '—'}
+            {displayUser?.updateTime ? displayUser.updateTime.replace('T', ' ') : '—'}
           </Descriptions.Item>
         </Descriptions>
       </Card>
