@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统功能模块树形结构图 - 学校宿舍管理系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #FFFFFF;
+            font-family: "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif;
+        }
+        .container { width: 1400px; height: 390px; }
+        svg { width: 100%; height: 100%; }
+        .tree-line { stroke: #C9A96E; stroke-width: 1.5; fill: none; }
+        .box-rect { fill: #FFFFFF; stroke: #C9A96E; stroke-width: 1.5; rx: 4; ry: 4; }
+        .text-bold { fill: #1A1A1A; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+        .text-leaf { fill: #2563EB; font-weight: 400; text-anchor: middle; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <svg viewBox="0 0 1400 370" xmlns="http://www.w3.org/2000/svg">
+
+        <!-- ==================== 连线层 ==================== -->
+
+        <!-- 第一层 → 第二层 -->
+        <line class="tree-line" x1="700"  y1="63"  x2="700"  y2="88" />
+        <line class="tree-line" x1="160"  y1="88"  x2="1240" y2="88" />
+        <line class="tree-line" x1="160"  y1="88"  x2="160"  y2="115" />
+        <line class="tree-line" x1="430"  y1="88"  x2="430"  y2="115" />
+        <line class="tree-line" x1="700"  y1="88"  x2="700"  y2="115" />
+        <line class="tree-line" x1="970"  y1="88"  x2="970"  y2="115" />
+        <line class="tree-line" x1="1240" y1="88"  x2="1240" y2="115" />
+
+        <!-- 第二层 → 第三层：宿舍管理 -->
+        <line class="tree-line" x1="160" y1="157" x2="160" y2="180" />
+        <line class="tree-line" x1="115" y1="180" x2="205" y2="180" />
+        <line class="tree-line" x1="115" y1="180" x2="115" y2="210" />
+        <line class="tree-line" x1="205" y1="180" x2="205" y2="210" />
+
+        <!-- 第二层 → 第三层：收费管理 -->
+        <line class="tree-line" x1="430" y1="157" x2="430" y2="180" />
+        <line class="tree-line" x1="325" y1="180" x2="535" y2="180" />
+        <line class="tree-line" x1="325" y1="180" x2="325" y2="210" />
+        <line class="tree-line" x1="395" y1="180" x2="395" y2="210" />
+        <line class="tree-line" x1="465" y1="180" x2="465" y2="210" />
+        <line class="tree-line" x1="535" y1="180" x2="535" y2="210" />
+
+        <!-- 第二层 → 第三层：系统管理 -->
+        <line class="tree-line" x1="700" y1="157" x2="700" y2="180" />
+        <line class="tree-line" x1="595" y1="180" x2="805" y2="180" />
+        <line class="tree-line" x1="595" y1="180" x2="595" y2="210" />
+        <line class="tree-line" x1="665" y1="180" x2="665" y2="210" />
+        <line class="tree-line" x1="735" y1="180" x2="735" y2="210" />
+        <line class="tree-line" x1="805" y1="180" x2="805" y2="210" />
+
+        <!-- 第二层 → 第三层：智能助手 -->
+        <line class="tree-line" x1="970" y1="157" x2="970" y2="180" />
+        <line class="tree-line" x1="930" y1="180" x2="1010" y2="180" />
+        <line class="tree-line" x1="930" y1="180" x2="930" y2="210" />
+        <line class="tree-line" x1="1010" y1="180" x2="1010" y2="210" />
+
+        <!-- 第二层 → 第三层：数据统计 -->
+        <line class="tree-line" x1="1240" y1="157" x2="1240" y2="180" />
+        <line class="tree-line" x1="1200" y1="180" x2="1280" y2="180" />
+        <line class="tree-line" x1="1200" y1="180" x2="1200" y2="210" />
+        <line class="tree-line" x1="1280" y1="180" x2="1280" y2="210" />
+
+        <!-- ==================== 矩形框层 ==================== -->
+
+        <!-- 第一层：顶层根节点 -->
+        <rect class="box-rect" x="590" y="15" width="220" height="48" />
+        <text class="text-bold" x="700" y="42" font-size="16">学校宿舍管理系统</text>
+
+        <!-- 第二层：一级业务模块 -->
+        <rect class="box-rect" x="100" y="115" width="120" height="42" />
+        <text class="text-bold" x="160" y="138" font-size="14">宿舍管理</text>
+
+        <rect class="box-rect" x="370" y="115" width="120" height="42" />
+        <text class="text-bold" x="430" y="138" font-size="14">收费管理</text>
+
+        <rect class="box-rect" x="640" y="115" width="120" height="42" />
+        <text class="text-bold" x="700" y="138" font-size="14">系统管理</text>
+
+        <rect class="box-rect" x="910" y="115" width="120" height="42" />
+        <text class="text-bold" x="970" y="138" font-size="14">智能助手</text>
+
+        <rect class="box-rect" x="1180" y="115" width="120" height="42" />
+        <text class="text-bold" x="1240" y="138" font-size="14">数据统计</text>
+
+        <!-- ==================== 第三层：叶子功能节点（竖直文字） ==================== -->
+
+        <!-- 宿舍管理 → 楼栋信息 -->
+        <rect class="box-rect" x="98"  y="210" width="34" height="100" />
+        <text class="text-leaf" font-size="13">
+            <tspan x="115" y="228">楼</tspan>
+            <tspan x="115" y="250">栋</tspan>
+            <tspan x="115" y="272">信</tspan>
+            <tspan x="115" y="294">息</tspan>
+        </text>
+
+        <!-- 宿舍管理 → 入住管理 -->
+        <rect class="box-rect" x="188" y="210" width="34" height="100" />
+        <text class="text-leaf" font-size="13">
+            <tspan x="205" y="228">入</tspan>
+            <tspan x="205" y="250">住</tspan>
+            <tspan x="205" y="272">管</tspan>
+            <tspan x="205" y="294">理</tspan>
+        </text>
+
+        <!-- 收费管理 → 收费项目 -->
+        <rect class="box-rect" x="308" y="210" width="34" height="100" />
+        <text class="text-leaf" font-size="13">
+            <tspan x="325" y="228">收</tspan>
+            <tspan x="325" y="250">费</tspan>
+            <tspan x="325" y="272">项</tspan>
+            <tspan x="325" y="294">目</tspan>
+        </text>
+
+        <!-- 收费管理 → 账单管理 -->
+        <rect class="box-rect" x="378" y="210" width="34" height="100" />
+        <text class="text-leaf" font-size="13">
+            <tspan x="395" y="228">账</tspan>
+            <tspan x="395" y="250">单</tspan>
+            <tspan x="395" y="272">管</tspan>
+            <tspan x="395" y="294">理</tspan>
+        </text>
+
+        <!-- 收费管理 → 缴费管理 -->
+        <rect class="box-rect" x="448" y="210" width="34" height="100" />
+        <text class="text-leaf" font-size="13">
+            <tspan x="465" y="228">缴</tspan>
+            <tspan x="465" y="250">费</tspan>
+            <tspan x="465" y="272">管</tspan>
+            <tspan x="465" y="294">理</tspan>
+        </text>
+
+        <!-- 收费管理 → 通知管理 -->
+        <rect class="box-rect" x="518" y="210" width="34" height="100" />
+        <text class="text-leaf" font-size="13">
+            <tspan x="535" y="228">通</tspan>
+            <tspan x="535" y="250">知</tspan>
+            <tspan x="535" y="272">管</tspan>
+            <tspan x="535" y="294">理</tspan>
+        </text>
+
+        <!-- 系统管理 → 用户管理 -->
+        <rect class="box-rect" x="578" y="210" width="34" height="100" />
+        <text class="text-leaf" font-size="13">
+            <tspan x="595" y="228">用</tspan>
+            <tspan x="595" y="250">户</tspan>
+            <tspan x="595" y="272">管</tspan>
+            <tspan x="595" y="294">理</tspan>
+        </text>
+
+        <!-- 系统管理 → 角色管理 -->
+        <rect class="box-rect" x="648" y="210" width="34" height="100" />
+        <text class="text-leaf" font-size="13">
+            <tspan x="665" y="228">角</tspan>
+            <tspan x="665" y="250">色</tspan>
+            <tspan x="665" y="272">管</tspan>
+            <tspan x="665" y="294">理</tspan>
+        </text>
+
+        <!-- 系统管理 → 菜单管理 -->
+        <rect class="box-rect" x="718" y="210" width="34" height="100" />
+        <text class="text-leaf" font-size="13">
+            <tspan x="735" y="228">菜</tspan>
+            <tspan x="735" y="250">单</tspan>
+            <tspan x="735" y="272">管</tspan>
+            <tspan x="735" y="294">理</tspan>
+        </text>
+
+        <!-- 系统管理 → 操作日志 -->
+        <rect class="box-rect" x="788" y="210" width="34" height="100" />
+        <text class="text-leaf" font-size="13">
+            <tspan x="805" y="228">操</tspan>
+            <tspan x="805" y="250">作</tspan>
+            <tspan x="805" y="272">日</tspan>
+            <tspan x="805" y="294">志</tspan>
+        </text>
+
+        <!-- 智能助手 → 智能问答 -->
+        <rect class="box-rect" x="913" y="210" width="34" height="100" />
+        <text class="text-leaf" font-size="13">
+            <tspan x="930" y="228">智</tspan>
+            <tspan x="930" y="250">能</tspan>
+            <tspan x="930" y="272">问</tspan>
+            <tspan x="930" y="294">答</tspan>
+        </text>
+
+        <!-- 智能助手 → 知识管理 -->
+        <rect class="box-rect" x="993" y="210" width="34" height="100" />
+        <text class="text-leaf" font-size="13">
+            <tspan x="1010" y="228">知</tspan>
+            <tspan x="1010" y="250">识</tspan>
+            <tspan x="1010" y="272">管</tspan>
+            <tspan x="1010" y="294">理</tspan>
+        </text>
+
+        <!-- 数据统计 → 统计概览 -->
+        <rect class="box-rect" x="1183" y="210" width="34" height="100" />
+        <text class="text-leaf" font-size="13">
+            <tspan x="1200" y="228">统</tspan>
+            <tspan x="1200" y="250">计</tspan>
+            <tspan x="1200" y="272">概</tspan>
+            <tspan x="1200" y="294">览</tspan>
+        </text>
+
+        <!-- 数据统计 → 报表分析 -->
+        <rect class="box-rect" x="1263" y="210" width="34" height="100" />
+        <text class="text-leaf" font-size="13">
+            <tspan x="1280" y="228">报</tspan>
+            <tspan x="1280" y="250">表</tspan>
+            <tspan x="1280" y="272">分</tspan>
+            <tspan x="1280" y="294">析</tspan>
+        </text>
+
+    </svg>
+</div>
+</body>
+</html>
