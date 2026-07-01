@@ -1,155 +1,21 @@
-// ========== API 响应 ==========
-export interface ApiResult<T = any> {
-  code: number;
-  message: string;
-  data: T;
-}
+// ========== 统一类型入口 ==========
+// 按领域拆分，所有类型由此文件 re-export，
+// 外部统一 `import { ... } from '../types'` 即可。
+//
+// 注意：React 组件 Props 类型保留在各组件文件中（React 惯例），不在此统一管理。
 
-export interface PageResult<T> {
-  records: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
-
-// ========== 实体类型 ==========
-export interface StudentDormitory {
-  id?: number;
-  studentName: string;
-  studentNo: string;
-  dormitoryNo: string;
-  phone?: string;
-  checkInDate?: string;
-  paymentStatus: string;
-  photo?: string;
-  userId?: number;
-  createTime?: string;
-}
-
-export interface FeeItem {
-  id?: number;
-  itemName: string;
-  feeType: string;
-  unitPrice: number;
-  billingCycle: string;
-  applicableDormType?: string;
-  status: string;
-  description?: string;
-}
-
-export interface PaymentBill {
-  id?: number;
-  studentId: number;
-  feeItemId: number;
-  billNo: string;
-  semester: string;
-  amount: number;
-  paidAmount: number;
-  dueDate: string;
-  status: string;
-  remark?: string;
-  studentName?: string;
-  studentNo?: string;
-  dormitoryNo?: string;
-  feeItemName?: string;
-  feeType?: string;
-  createTime?: string;
-}
-
-export interface PaymentRecord {
-  id?: number;
-  billId: number;
-  studentId: number;
-  orderNo: string;
-  amount: number;
-  payMethod: string;
-  tradeNo?: string;
-  payTime?: string;
-  status: string;
-  receiptUrl?: string;
-  studentName?: string;
-  studentNo?: string;
-  billNo?: string;
-  createTime?: string;
-}
-
-export interface DashboardOverview {
-  totalStudents: number;
-  totalBillsThisSemester: number;
-  totalAmount: number;
-  paidAmount: number;
-  collectionRate: number;
-  overdueCount: number;
-  overdueAmount: number;
-  unpaidCount: number;
-  feeTypeDistribution: { feeType: string; count: number; totalAmount: number }[];
-}
-
-export interface AiQaResult {
-  question: string;
-  answer: string;
-  source: string;
-  confidence: number;
-}
-
-export interface AiQaLog {
-  id: number;
-  userId: string;
-  question: string;
-  answer: string;
-  source: string;
-  responseTime: number;
-  createTime: string;
-}
-
-// ========== 登录 (RBAC) ==========
-export interface MenuItem {
-  id: number;
-  parentId: number;
-  menuName: string;
-  menuType: 'MENU' | 'PAGE' | 'BUTTON';
-  path?: string;
-  icon?: string;
-  permissionCode?: string;
-  sortOrder: number;
-  visible: number;
-  children?: MenuItem[];
-}
-
-export interface LoginResult {
-  token: string;
-  username: string;
-  realName: string;
-  role: string;
-  roleName: string;
-  permissions: string[];
-  menus: MenuItem[];
-  studentInfo?: {
-    id: number;
-    studentNo: string;
-    studentName: string;
-    dormitoryNo: string;
-    phone: string;
-    checkInDate: string;
-    paymentStatus: string;
-  };
-}
-
-export interface RoleItem {
-  id: number;
-  roleCode: string;
-  roleName: string;
-  description?: string;
-  status: string;
-  createTime: string;
-}
-
-export interface UserInfo {
-  id: number;
-  username: string;
-  realName: string;
-  role: string;
-  status: string;
-  avatar?: string;
-  createTime?: string;
-}
+export type { ApiResult, PageResult } from './api';
+export type { MenuItem, LoginResult, RoleItem, UserInfo } from './auth';
+export type { Citation, Message, Conversation } from './chat';
+export type {
+  StudentDormitory,
+  FeeItem,
+  PaymentBill,
+  PaymentRecord,
+  DormitoryRecord,
+  LogRecord,
+} from './entities';
+export type { DashboardOverview } from './dashboard';
+export type { AiQaResult, AiQaLog } from './ai';
+export type { KbDocument, KbChunk, BatchFile } from './kb';
+export type { AuthContextType, AuthState, ChatState } from './store';

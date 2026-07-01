@@ -6,11 +6,6 @@ import { Home, FileText, Bot, User } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { ExpandableTabs } from '@/components/ui/expandable-tabs';
 
-
-// 在JavaScript， TypeScript里面嵌入html
-// React 分为 类组件（官方不推荐） 和 函数式组件
-// React 有 19 个版本，18 版以前是类组件，18 版开始变成函数式组件
-
 const { Header, Content, Footer } = Layout;
 const { Text } = Typography;
 
@@ -36,7 +31,9 @@ const indexToPath: Record<number, string> = {
 };
 
 const StudentLayout: React.FC = () => {
+  // 用于路由跳转
   const navigate = useNavigate();
+  // 获取当前 URL 的路由信息
   const location = useLocation();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);

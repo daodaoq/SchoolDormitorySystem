@@ -26,7 +26,7 @@ const Payment: React.FC = () => {
     try {
       const res = await getPaymentRecords({ page, pageSize, studentNo: studentNoFilter || undefined });
       setRecords(res.data.records); setTotal(res.data.total);
-    } catch { message.error('加载支付记录失败'); }
+    } catch (err) { console.error(err); message.error('加载支付记录失败'); }
     setLoading(false);
   };
 

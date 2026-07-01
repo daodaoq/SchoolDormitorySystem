@@ -33,7 +33,7 @@ const MyBills: React.FC = () => {
     try {
       const res = await getBills({ studentNo: user?.username, pageSize: 999 });
       setBills(res.data.records || []);
-    } catch { message.error('加载账单失败'); }
+    } catch (err) { console.error(err); message.error('加载账单失败'); }
     setLoading(false);
   };
 
@@ -42,7 +42,7 @@ const MyBills: React.FC = () => {
     try {
       const res = await getPaymentRecords({ studentNo: user?.username, pageSize: 999 });
       setRecords(res.data.records || []);
-    } catch { message.error('加载支付记录失败'); }
+    } catch (err) { console.error(err); message.error('加载支付记录失败'); }
     setRecordsLoading(false);
   };
 
@@ -55,9 +55,7 @@ const MyBills: React.FC = () => {
       if (!orderNo) { message.error('创建支付订单失败'); return; }
       window.open(`/api/payment/pay-page/${orderNo}`, '_blank');
       loadBills();
-    } catch {
-      message.error('创建支付订单失败');
-    } finally {
+    } catch (err) { console.error('创建支付订单失败', err); message.error('创建支付订单失败'); } finally {
       setPayingIds(prev => { const next = new Set(prev); next.delete(bill.id!); return next; });
     }
   };
@@ -79,9 +77,7 @@ const MyBills: React.FC = () => {
       message.success('缴费成功');
       setConfirmTarget(null);
       loadBills();
-    } catch {
-      message.error('操作失败');
-    }
+    } catch (err) { console.error('缴费操作失败', err); message.error('操作失败'); }
     setConfirming(false);
   };
 

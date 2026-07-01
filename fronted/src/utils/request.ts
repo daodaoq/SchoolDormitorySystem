@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { message } from 'antd';
+import { getToken } from './token';
 
 const request = axios.create({
   baseURL: '/api',
@@ -7,15 +8,8 @@ const request = axios.create({
 });
 
 request.interceptors.request.use((config) => {
-  const auth = localStorage.getItem('auth');
-  if (auth) {
-    try {
-      const parsed = JSON.parse(auth);
-      // Zustand v5 persist 格式为 { state: {...}, version: 0 }，v4 为扁平结构
-      const token = parsed?.state?.token || parsed?.token;
-      if (token) config.headers.Authorization = `Bearer ${token}`;
-    } catch { /* ignore */ }
-  }
+  const token = getToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 

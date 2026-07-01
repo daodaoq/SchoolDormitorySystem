@@ -120,7 +120,7 @@ const Login: React.FC = () => {
             </Button>
           </Form.Item>
         </Form>
-
+{/* 
         <Text style={{
           display: 'block',
           textAlign: 'center',
@@ -130,7 +130,7 @@ const Login: React.FC = () => {
           letterSpacing: '0.05em',
         }}>
           默认账号: admin / 123456
-        </Text>
+        </Text> */}
       </Card>
     </div>
   );

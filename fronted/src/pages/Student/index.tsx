@@ -32,9 +32,7 @@ const Student: React.FC = () => {
         label: d.dormitoryNo + (d.building ? ' (' + d.building + ')' : ''),
         value: d.dormitoryNo,
       })));
-    } catch {
-      message.error('加载宿舍列表失败，请刷新重试');
-    }
+    } catch (err) { console.error('加载宿舍列表失败', err); message.error('加载宿舍列表失败，请刷新重试'); }
   };
 
   useEffect(() => { loadDormitoryOptions(); }, []);
@@ -45,12 +43,13 @@ const Student: React.FC = () => {
       const res = await getStudents({ page, pageSize, ...filters });
       setData(res.data.records);
       setTotal(res.data.total);
-    } catch { message.error('加载学生数据失败'); }
+    } catch (err) { console.error(err); message.error('加载学生数据失败'); }
     setLoading(false);
   };
 
   const handleAdd = async () => {
-    setEditingId(null); setEditingPhoto('');
+    setEditingId(null); 
+    setEditingPhoto('');
     form.resetFields();
     if (dormitoryOptions.length === 0) await loadDormitoryOptions();
     setModalVisible(true);
@@ -76,7 +75,7 @@ const Student: React.FC = () => {
         setEditingPhoto(res.data.photo);
         message.success('照片上传成功');
       }
-    } catch { message.error('上传失败'); }
+    } catch (err) { console.error(err); message.error('上传失败'); }
     setUploading(false);
     return false;
   };
@@ -102,15 +101,26 @@ const Student: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => { await deleteStudent(id); message.success('删除成功'); fetchData(); };
-  const handleImport = async (file: File) => { try { const res = await importStudents(file); message.success(res.message); fetchData(); } catch { message.error('导入失败，请检查文件格式'); } return false; };
+  const handleImport = async (file: File) => { 
+    try { 
+      const res = await importStudents(file); 
+      message.success(res.message); 
+      fetchData(); 
+    } catch (err) { console.error(err); message.error('导入失败，请检查文件格式'); } 
+    return false; 
+  };
+
   const handleExport = async () => {
     try {
       const res: any = await exportStudents(filters);
       const blob = new Blob([res], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = '学生信息.xlsx'; a.click();
+      const a = document.createElement('a'); 
+      a.href = url; 
+      a.download = '学生信息.xlsx'; 
+      a.click();
       window.URL.revokeObjectURL(url);
-    } catch { message.error('导出失败'); }
+    } catch (err) { console.error(err); message.error('导出失败'); }
   };
 
   const columns = [
@@ -162,6 +172,7 @@ const Student: React.FC = () => {
           <AlertTitle>带 * 的字段为必填项，请完整填写后提交</AlertTitle>
         </Alert>
         <Form form={form} layout="vertical">
+          {/* 通过 name 来绑定数据 */}
           <Form.Item name="studentName" label="姓名" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="studentNo" label="学号" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="dormitoryNo" label="宿舍号" rules={[{ required: true, message: '请选择宿舍' }]}>

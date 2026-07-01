@@ -11,16 +11,23 @@ const { Content } = Layout;
 /** 动态获取 Ant Design 图标 */
 const getIcon = (iconName?: string): React.ReactNode => {
   if (!iconName) return null;
-  const IconComp = (Icons as Record<string, React.ComponentType>)[iconName];
+  const IconComp = (Icons as unknown as Record<string, React.ComponentType>)[iconName];
   return IconComp ? <IconComp /> : null;
 };
 
 /** 判断菜单项或其子项是否匹配当前路径 */
 function isMenuActive(menu: MenuItem, pathname: string): boolean {
+  // 1. 如果当前菜单有路径，且当前路径以菜单路径开头 → 激活
   if (menu.path && pathname.startsWith(menu.path)) return true;
+
+  // 2. 如果当前菜单有子菜单
   if (menu.children?.length) {
+    // 3. 递归/遍历检查子菜单：只要有一个子菜单路径匹配，当前菜单就激活
+    // some 只返回是否有符合要求的元素的判断，不返回具体的元素，只要有一个满足要求就返回 true
     return menu.children.some((child) => child.path && pathname.startsWith(child.path));
   }
+
+  // 4. 都不匹配 → 不激活
   return false;
 }
 
@@ -50,22 +57,32 @@ const BasicLayout: React.FC = () => {
   // 首次渲染时自动展开包含当前路径的父菜单
   React.useEffect(() => {
     const toExpand: string[] = [];
+
+    // 1. 遍历所有顶级菜单
     topMenus.forEach((menu) => {
+      // 2. 如果当前菜单激活（或其子菜单激活），且有子菜单
       if (isMenuActive(menu, location.pathname) && menu.children?.length) {
+        // 记录需要展开的菜单ID
         toExpand.push(String(menu.id));
       }
     });
+
+    // 3. 如果有需要展开的菜单
     if (toExpand.length > 0) {
       setExpanded((prev) => {
         let changed = false;
-        const next = new Set(prev);
+        const next = new Set(prev); // 复制当前展开状态
+
+        // 4. 把所有需要展开的ID加入 Set
         for (const id of toExpand) {
           if (!next.has(id)) { next.add(id); changed = true; }
         }
-        return changed ? next : prev; // 无变化则返回原引用，避免重渲染
+
+        // 5. 有变化才更新，否则返回原引用（避免不必要的重渲染）
+        return changed ? next : prev;
       });
     }
-  }, [location.pathname]);
+  }, [location.pathname]); // 依赖路由变化
 
   const toggleExpand = (id: string) => {
     setExpanded((prev) => {

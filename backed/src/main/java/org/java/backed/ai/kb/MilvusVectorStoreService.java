@@ -23,16 +23,24 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 /**
  * Milvus 向量存储服务
  * 负责向量 Collection 管理、插入、检索
+ *
+ * 容错策略：
+ * - 启动时不要求 Milvus 立即可用（后端可能先于 Docker 启动）
+ * - 连接失败后自动定时重试（初始 5 秒，之后每 30 秒）
+ * - 连接成功前所有搜索操作返回空列表，不影响主流程
  */
 @Slf4j
 @Service
@@ -51,30 +59,123 @@ public class MilvusVectorStoreService {
     @Value("${milvus.port:19530}")
     private int milvusPort;
 
-    private MilvusServiceClient client;
+    private volatile MilvusServiceClient client;
+
+    /** 重连中标记，避免并发重复连接 */
+    private final AtomicBoolean connecting = new AtomicBoolean(false);
+
+    /** 首次连接是否已尝试（用于日志降级） */
+    private volatile boolean firstAttemptDone = false;
 
     @PostConstruct
     public void init() {
-        try {
-            client = new MilvusServiceClient(
-                    ConnectParam.newBuilder()
-                            .withHost(milvusHost)
-                            .withPort(milvusPort)
-                            .build()
-            );
-            ensureCollection();
-            log.info("Milvus 连接成功: {}:{}", milvusHost, milvusPort);
-        } catch (Exception e) {
-            log.error("Milvus 连接失败，向量检索将不可用", e);
-            client = null;
-        }
+        // 异步尝试首次连接，不阻塞 Spring Boot 启动
+        Thread initThread = new Thread(this::connectWithRetry, "milvus-init");
+        initThread.setDaemon(true);
+        initThread.start();
     }
 
     @PreDestroy
     public void destroy() {
-        if (client != null) {
-            client.close();
+        connecting.set(false);
+        MilvusServiceClient c = client;
+        client = null;
+        if (c != null) {
+            try {
+                c.close();
+            } catch (Exception ignored) {}
         }
+    }
+
+    /**
+     * 带退避重试的连接逻辑
+     * 初始间隔 5 秒，之后每次翻倍，最多 60 秒
+     */
+    private void connectWithRetry() {
+        if (!connecting.compareAndSet(false, true)) {
+            return; // 已有重连线程在运行
+        }
+
+        long delaySec = 5;
+        final long maxDelaySec = 60;
+
+        try {
+            while (connecting.get()) {
+                try {
+                    doConnect();
+                    log.info("Milvus 连接成功: {}:{}", milvusHost, milvusPort);
+                    firstAttemptDone = true;
+                    return; // 成功，退出重试循环
+                } catch (Exception e) {
+                    if (!firstAttemptDone) {
+                        log.warn("Milvus 首次连接失败 ({}:{})，{} 秒后重试: {}",
+                                milvusHost, milvusPort, delaySec, e.getMessage());
+                        firstAttemptDone = true;
+                    } else {
+                        log.debug("Milvus 重连失败，{} 秒后重试: {}", delaySec, e.getMessage());
+                    }
+                }
+
+                // 退避等待
+                try {
+                    TimeUnit.SECONDS.sleep(delaySec);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    connecting.set(false);
+                    return;
+                }
+
+                delaySec = Math.min(delaySec * 2, maxDelaySec);
+            }
+        } finally {
+            connecting.set(false);
+        }
+    }
+
+    /**
+     * 定时重连检查（每 30 秒一次）
+     * 如果 client 为 null 且无其他线程在重连，触发重连
+     */
+    @Scheduled(fixedDelay = 30_000, initialDelay = 60_000)
+    public void scheduledReconnect() {
+        if (client == null && connecting.compareAndSet(false, true)) {
+            try {
+                log.info("定时重连 Milvus: {}:{}", milvusHost, milvusPort);
+                doConnect();
+                log.info("定时重连 Milvus 成功: {}:{}", milvusHost, milvusPort);
+            } catch (Exception e) {
+                log.debug("定时重连 Milvus 仍失败: {}", e.getMessage());
+            } finally {
+                connecting.set(false);
+            }
+        }
+    }
+
+    /**
+     * 实际执行连接 + 确保 Collection 存在
+     */
+    private synchronized void doConnect() {
+        MilvusServiceClient oldClient = this.client;
+        MilvusServiceClient newClient = new MilvusServiceClient(
+                ConnectParam.newBuilder()
+                        .withHost(milvusHost)
+                        .withPort(milvusPort)
+                        .build()
+        );
+
+        // 测试连接
+        HasCollectionParam hasParam = HasCollectionParam.newBuilder()
+                .withCollectionName(COLLECTION_NAME)
+                .build();
+        newClient.hasCollection(hasParam);
+
+        // 连接成功 → 替换旧 client
+        this.client = newClient;
+        if (oldClient != null) {
+            try { oldClient.close(); } catch (Exception ignored) {}
+        }
+
+        ensureCollection();
     }
 
     /**

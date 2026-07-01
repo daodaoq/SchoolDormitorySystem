@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Statistic, Spin } from 'antd';
+import { Card, Row, Col, Statistic, Spin, message } from 'antd';
 import { UserOutlined, FileTextOutlined, DollarOutlined, WarningOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { getOverview } from '../../services/api';
@@ -55,7 +55,7 @@ const Dashboard: React.FC = () => {
     try {
       const res = await getOverview();
       setData(res.data as DashboardOverview);
-    } catch { message.error('加载概览数据失败'); }
+    } catch (err) { console.error(err); message.error('加载概览数据失败'); }
     setLoading(false);
   };
 

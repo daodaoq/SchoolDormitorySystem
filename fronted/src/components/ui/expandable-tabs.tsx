@@ -48,7 +48,7 @@ const spanVariants = {
   exit: { maxWidth: 0, opacity: 0 },
 };
 
-const transition = { delay: 0.1, type: "spring", bounce: 0, duration: 0.6 };
+const transition = { delay: 0.1, type: "spring" as const, bounce: 0, duration: 0.6 };
 
 export function ExpandableTabs({
   tabs,
@@ -58,13 +58,13 @@ export function ExpandableTabs({
   selectedIndex,
 }: ExpandableTabsProps) {
   const [internalSelected, setInternalSelected] = React.useState<number | null>(null);
-  const outsideClickRef = React.useRef(null);
+  const outsideClickRef = React.useRef<HTMLDivElement>(null);
 
   // 受控模式使用外部 selectedIndex，否则使用内部状态
   const isControlled = selectedIndex !== undefined;
   const selected = isControlled ? (selectedIndex ?? null) : internalSelected;
 
-  useOnClickOutside(outsideClickRef, () => {
+  useOnClickOutside(outsideClickRef as React.RefObject<HTMLElement>, () => {
     if (!isControlled) setInternalSelected(null);
     onChange?.(null);
   });

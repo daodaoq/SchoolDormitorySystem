@@ -32,12 +32,22 @@ const Bill: React.FC = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    try { const res = await getBills({ page, pageSize, ...filters }); setData(res.data.records); setTotal(res.data.total); } catch { message.error('加载账单数据失败'); }
+    try { 
+      const res = await getBills({ page, pageSize, ...filters }); 
+      setData(res.data.records); 
+      setTotal(res.data.total); 
+    } catch (err) { console.error(err); message.error('加载账单数据失败'); }
     setLoading(false);
   };
 
   const handleGenerate = async () => {
-    try { const values = await form.validateFields(); const res = await generateBills(values); message.success(res.message); setGenerateModal(false); fetchData(); } catch (e: any) { if (!e?.errorFields) message.error('生成账单失败'); }
+    try { 
+      const values = await form.validateFields(); 
+      const res = await generateBills(values); 
+      message.success(res.message); 
+      setGenerateModal(false); 
+      fetchData(); 
+    } catch (e: any) { if (!e?.errorFields) message.error('生成账单失败'); }
   };
 
   const openCreateModal = async () => {
@@ -48,7 +58,7 @@ const Bill: React.FC = () => {
       ]);
       setStudents(sRes.data.records || []);
       setFeeItems(fRes.data || []);
-    } catch { /* */ }
+    } catch (err) { console.error('加载账单表单数据失败', err); message.error('加载数据失败，请刷新重试'); }
     createForm.resetFields();
     createForm.setFieldsValue({ semester: new Date().getFullYear() + '-' + (new Date().getMonth() < 8 ? '1' : '2') });
     setCreateModal(true);
@@ -82,7 +92,7 @@ const Bill: React.FC = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = '缴费账单.xlsx'; a.click();
       window.URL.revokeObjectURL(url);
-    } catch { message.error('导出失败'); }
+    } catch (err) { console.error(err); message.error('导出失败'); }
   };
 
   const columns = [

@@ -9,22 +9,23 @@ interface AuthState {
   menus: MenuItem[];
   initializing: boolean;
 
-  // actions
-  login: (data: LoginResult) => void;
-  logout: () => void;
-  setInitialized: () => void;
-  hasPermission: (code: string) => boolean;
+  login: (data: LoginResult) => void; // 登录
+  logout: () => void; // 退出
+  setInitialized: () => void; // 标记初始化完成
+  hasPermission: (code: string) => boolean; // 检查权限
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
+      // state: 数据
       user: null,
       token: null,
       permissions: [],
       menus: [],
       initializing: true,
 
+      // actions: 操作函数
       login: (data: LoginResult) =>
         set({
           user: data,
@@ -46,17 +47,20 @@ export const useAuthStore = create<AuthState>()(
       hasPermission: (code: string) => get().permissions.includes(code),
     }),
     {
-      name: 'auth', // localStorage key
+      // 持久化配置
+      // localStorage 的 key 名称
+      name: 'auth',
       partialize: (state) => ({
-        // Only persist these fields
+        // 只保存这些字段到 localStorage
         user: state.user,
         token: state.token,
         permissions: state.permissions,
         menus: state.menus,
       }),
       onRehydrateStorage: () => (state) => {
-        // After hydration from localStorage, mark as initialized
+        // 从 localStorage 恢复数据后执行
         if (state) {
+          // 标记初始化完成
           state.setInitialized();
         }
       },
@@ -64,5 +68,5 @@ export const useAuthStore = create<AuthState>()(
   ),
 );
 
-// Convenience: read-only derived value
+// 这是一个派生状态，用来快速判断是否已登录
 export const useIsAuthenticated = () => useAuthStore((s) => !!s.token);

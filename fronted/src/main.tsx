@@ -111,7 +111,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           },
           Tag: {
             borderRadiusSM: 9999,
-            paddingInline: 12,
           },
           Menu: {
             itemBorderRadius: 9999,

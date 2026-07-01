@@ -195,14 +195,24 @@ public class StatisticsServiceImpl implements StatisticsService {
     }
 
     @Override
+    @Cacheable(cacheNames = CacheConfig.CACHE_STATS, key = "'arrears_' + #page + '_' + #pageSize + '_' + (#dormitoryNo ?: 'all')")
     public Map<String, Object> getArrears(int page, int pageSize, String dormitoryNo) {
         LambdaQueryWrapper<PaymentBill> wrapper = new LambdaQueryWrapper<>();
         wrapper.in(PaymentBill::getStatus, List.of("UNPAID", "OVERDUE"));
         List<PaymentBill> allArrears = billService.list(wrapper);
 
+        // 批量查询所有相关学生，避免 N+1 问题
+        Set<Long> studentIds = allArrears.stream()
+                .map(PaymentBill::getStudentId)
+                .collect(Collectors.toSet());
+        Map<Long, StudentDormitory> studentMap = studentIds.isEmpty()
+                ? Collections.emptyMap()
+                : studentService.listByIds(studentIds).stream()
+                    .collect(Collectors.toMap(StudentDormitory::getId, s -> s, (a, b) -> a));
+
         List<Map<String, Object>> arrearsList = new ArrayList<>();
         for (PaymentBill bill : allArrears) {
-            StudentDormitory student = studentService.getById(bill.getStudentId());
+            StudentDormitory student = studentMap.get(bill.getStudentId());
             if (student == null) continue;
             if (dormitoryNo != null && !dormitoryNo.isEmpty() && !student.getDormitoryNo().contains(dormitoryNo)) continue;
 

@@ -2,25 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Modal, Spin, Tag, Empty } from 'antd';
 import { FileTextOutlined, HighlightOutlined } from '@ant-design/icons';
 import { getKbDocumentChunks } from '../../services/api';
-
-interface KbChunk {
-  id: number;
-  documentId: number;
-  chunkId?: string;
-  chunkIndex: number;
-  content: string;
-  tokenCount?: number;
-}
-
-interface KbDocument {
-  id: number;
-  title: string;
-  fileName: string;
-  fileType: string;
-  fileSize: number;
-  chunkCount: number;
-  status: string;
-}
+import type { KbChunk, KbDocument } from '../../types';
 
 interface DocumentViewerProps {
   docId: number;
@@ -41,6 +23,9 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
 }) => {
   const [chunks, setChunks] = useState<KbChunk[]>([]);
   const [loading, setLoading] = useState(false);
+  // 此时：highlightRef = { current: null }
+  // 就像一个空标签，还没贴在任何东西上
+  // ref 的作用：把 DOM 元素 赋值给 highlightRef.current
   const highlightRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -128,6 +113,7 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
             return (
               <div
                 key={chunk.id || idx}
+                // highlighted = true 时，把当前 <div> 赋值给 highlightRef.current
                 ref={highlighted ? highlightRef : undefined}
                 style={{
                   padding: '14px 18px',

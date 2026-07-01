@@ -3,18 +3,9 @@ import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, 
 import { PlusOutlined, KeyOutlined, UserOutlined, UploadOutlined } from '@ant-design/icons';
 import { AlertTriangle } from 'lucide-react';
 import { getUsers, addUser, updateUser, deleteUser, resetUserPassword } from '../../services/api';
+import type { UserInfo } from '../../types';
 import { Alert, AlertIcon, AlertTitle } from '@/components/ui/alert-1';
 import request from '../../utils/request';
-
-interface UserRecord {
-  id: number;
-  username: string;
-  realName?: string;
-  role: string;
-  status: string;
-  avatar?: string;
-  createTime: string;
-}
 
 const roleMap: Record<string, { color: string; label: string }> = {
   ADMIN: { color: 'red', label: '管理员' },
@@ -23,7 +14,7 @@ const roleMap: Record<string, { color: string; label: string }> = {
 };
 
 const Users: React.FC = () => {
-  const [data, setData] = useState<UserRecord[]>([]);
+  const [data, setData] = useState<UserInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -33,6 +24,7 @@ const Users: React.FC = () => {
   const [avatarUrl, setAvatarUrl] = useState<string>('');
   const [uploading, setUploading] = useState(false);
   const [roleFilter, setRoleFilter] = useState<string | undefined>(undefined);
+  // 这个 form 实例相当于一个控制器，让你可以在组件中主动操控表单，而不是被动等待用户输入
   const [form] = Form.useForm();
 
   useEffect(() => { fetchData(); }, [page, pageSize, roleFilter]);
@@ -43,7 +35,7 @@ const Users: React.FC = () => {
       const res = await getUsers({ page, pageSize, role: roleFilter });
       setData(res.data.records);
       setTotal(res.data.total);
-    } catch { message.error('加载用户数据失败'); }
+    } catch (err) { console.error(err); message.error('加载用户数据失败'); }
     setLoading(false);
   };
 
@@ -55,7 +47,7 @@ const Users: React.FC = () => {
     setModalVisible(true);
   };
 
-  const handleEdit = (record: UserRecord) => {
+  const handleEdit = (record: UserInfo) => {
     setEditingId(record.id);
     setAvatarUrl(record.avatar || '');
     form.setFieldsValue({ realName: record.realName, role: record.role, status: record.status });
@@ -75,7 +67,7 @@ const Users: React.FC = () => {
         setAvatarUrl(res.data.avatar);
         message.success('头像上传成功');
       }
-    } catch { message.error('上传失败'); }
+    } catch (err) { console.error(err); message.error('上传失败'); }
     setUploading(false);
     return false;
   };
@@ -101,7 +93,7 @@ const Users: React.FC = () => {
   const columns = [
     {
       title: '头像', dataIndex: 'avatar', width: 64,
-      render: (url: string, record: UserRecord) => (
+      render: (url: string, record: UserInfo) => (
         <Avatar src={url || undefined} icon={!url ? <UserOutlined /> : undefined}
           size={36} style={{ background: url ? 'transparent' : 'var(--coral)', color: '#fff' }} />
       ),
@@ -122,7 +114,7 @@ const Users: React.FC = () => {
     { title: '创建时间', dataIndex: 'createTime', render: (v: string) => v ? v.replace('T', ' ') : '-' },
     {
       title: '操作', width: 260,
-      render: (_: any, record: UserRecord) => (
+      render: (_: any, record: UserInfo) => (
         <Space>
           <Button type="link" size="small" onClick={() => handleEdit(record)}>编辑</Button>
           <Popconfirm title="确定重置密码为123456?" onConfirm={() => handleResetPwd(record.id)}>

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { getAuthData } from '../utils/token';
 import type { LoginResult, MenuItem } from '../types';
 
 interface AuthContextType {
@@ -22,7 +23,6 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
-// zustand === pinia
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<LoginResult | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -32,17 +32,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // 初始化：同步读取 localStorage（不依赖 useEffect 的异步时序）
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('auth');
-      if (saved) {
-        const parsed = JSON.parse(saved) as LoginResult;
-        setUser(parsed);
-        setToken(parsed.token);
-        setPermissions(parsed.permissions || []);
-        setMenus(parsed.menus || []);
-      }
-    } catch {
-      localStorage.removeItem('auth');
+    const saved = getAuthData<LoginResult>();
+    if (saved) {
+      setUser(saved);
+      setToken(saved.token);
+      setPermissions(saved.permissions || []);
+      setMenus(saved.menus || []);
     }
     setInitializing(false);
   }, []);

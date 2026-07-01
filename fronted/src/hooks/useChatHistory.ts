@@ -1,30 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-
-interface Citation {
-  markerId?: number;       // 引用标记编号，对应回答中的 [N]
-  chunkId?: string;        // Milvus chunk_id，用于段落定位
-  docTitle: string;
-  content?: string;
-  score: number;
-  docId: number;
-  chunkIndex?: number;     // 段落序号（从0开始）
-  confidence?: 'HIGH' | 'LOW';  // 溯源置信度
-  referenced?: boolean;    // LLM 是否实际引用了此来源
-}
-
-export interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-  source?: string;
-  citations?: Citation[];
-}
-
-export interface Conversation {
-  id: string;
-  title: string;
-  messages: Message[];
-  createdAt: number;
-}
+import type { Citation, Message, Conversation } from '../types';
 
 const MAX_CONVERSATIONS = 50;
 
@@ -32,20 +7,32 @@ function getStorageKey(userId: string): string {
   return `chat-conversations-${userId}`;
 }
 
+/**
+ * 加载对话记录
+ */ 
 function loadConversations(storageKey: string): Conversation[] {
   try {
     const raw = localStorage.getItem(storageKey);
     if (raw) return JSON.parse(raw);
-  } catch { /* ignore */ }
+  } catch (err) {
+    console.warn('[useChatHistory] 对话数据损坏，已重置', err);
+    localStorage.removeItem(storageKey);
+  }
   return [];
 }
 
+/**
+ * 保存对话记录
+ */
 function saveConversations(storageKey: string, convs: Conversation[]) {
   try {
     localStorage.setItem(storageKey, JSON.stringify(convs));
-  } catch { /* ignore */ }
+  } catch (err) { console.warn('[useChatHistory] localStorage 配额不足，对话未保存', err); }
 }
 
+/**
+ * 随机生成 id
+ */
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
@@ -54,11 +41,18 @@ function generateId(): string {
  * 从消息中自动生成对话标题
  */
 function deriveTitle(messages: Message[]): string {
+  // 1. 在消息列表中查找第一条 role 为 'user' 的消息
   const firstUser = messages.find((m) => m.role === 'user');
+  // 2. 如果找到了用户消息
   if (firstUser) {
+    // 2.1 提取内容，把所有空白字符（空格、换行、制表符等）替换为单个空格
     const text = firstUser.content.replace(/\s+/g, ' ').trim();
+
+    // 2.2 如果长度大于 24，截取前 24 个字符并加省略号，否则返回完整内容
     return text.length > 24 ? text.slice(0, 24) + '…' : text;
   }
+
+  // 3. 如果没找到用户消息（比如空对话），返回默认标题
   return '新对话';
 }
 
@@ -75,6 +69,7 @@ export function useChatHistory(userId: string) {
       const key = getStorageKey(userId);
       const convs = loadConversations(key);
       setConversations(convs);
+      // 切换第一个对话记录作为展示
       setActiveId(convs.length > 0 ? convs[0].id : '');
     }
   }, [userId]);

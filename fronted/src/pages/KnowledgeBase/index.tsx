@@ -2,15 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button, Table, Modal, Upload, Tag, message, Space, Input, Typography, Card } from 'antd';
 import { PlusOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, InboxOutlined, FileTextOutlined, CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined } from '@ant-design/icons';
 import { getKbDocuments, uploadKbDocument, deleteKbDocument, getKbDocumentChunks, reprocessKbDocument, searchKnowledgeBase } from '../../services/api';
+import type { KbDocument, BatchFile } from '../../types';
 
 const { Text, Paragraph } = Typography;
 const { Dragger } = Upload;
-
-interface KbDocument {
-  id: number; title: string; description: string; fileName: string;
-  fileType: string; fileSize: number; chunkCount: number;
-  status: string; errorMsg?: string; createTime: string;
-}
 
 const statusColors: Record<string, string> = {
   PENDING: 'default', PROCESSING: 'processing', COMPLETED: 'success', FAILED: 'error',
@@ -31,14 +26,6 @@ const KnowledgeBase: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // 批量上传状态
-  interface BatchFile {
-    uid: string;
-    name: string;
-    size: number;
-    status: 'pending' | 'uploading' | 'success' | 'error';
-    errorMsg?: string;
-  }
   const [batchFiles, setBatchFiles] = useState<BatchFile[]>([]);
   const [batchUploading, setBatchUploading] = useState(false);
   const fileRef = React.useRef<File[]>([]);
@@ -48,7 +35,7 @@ const KnowledgeBase: React.FC = () => {
     try {
       const res = await getKbDocuments({ page: 1, pageSize: 50 });
       setDocs(res.data?.records || []);
-    } catch { message.error('获取文档列表失败'); }
+    } catch (err) { console.error(err); message.error('获取文档列表失败'); }
     setLoading(false);
   }, []);
 
@@ -63,7 +50,7 @@ const KnowledgeBase: React.FC = () => {
         setUploadOpen(false);
         fetchDocs();
       }
-    } catch { message.error('上传失败'); }
+    } catch (err) { console.error(err); message.error('上传失败'); }
     return false;
   };
 
@@ -90,7 +77,10 @@ const KnowledgeBase: React.FC = () => {
   };
 
   const startBatchUpload = async () => {
+    // 检查是否正在上传（防止重复点击）
     if (fileRef.current.length === 0 || batchUploading) return;
+
+    // 设置 batchUploading = true 禁用按钮
     setBatchUploading(true);
 
     let successCount = 0;
@@ -101,6 +91,7 @@ const KnowledgeBase: React.FC = () => {
       const uid = batchFiles[i]?.uid;
       if (!uid) continue;
 
+      // 更新状态为「上传中」
       setBatchFiles((prev) =>
         prev.map((f) => (f.uid === uid ? { ...f, status: 'uploading' as const } : f)),
       );
@@ -159,7 +150,7 @@ const KnowledgeBase: React.FC = () => {
       const res = await getKbDocumentChunks(id);
       setChunks(res.data || []);
       setChunksOpen(true);
-    } catch { message.error('获取分块失败'); }
+    } catch (err) { console.error(err); message.error('获取分块失败'); }
   };
 
   const handleReprocess = async (id: number) => {
@@ -174,7 +165,7 @@ const KnowledgeBase: React.FC = () => {
     try {
       const res = await searchKnowledgeBase(searchQuery, 5);
       setSearchResults(res.data || []);
-    } catch { message.error('搜索失败'); }
+    } catch (err) { console.error(err); message.error('搜索失败'); }
     setSearching(false);
   };
 

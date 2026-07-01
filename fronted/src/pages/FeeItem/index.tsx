@@ -25,7 +25,7 @@ const FeeItemPage: React.FC = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    try { const res = await getFeeItems({ page, pageSize, ...filters }); setData(res.data.records); setTotal(res.data.total); } catch { message.error('加载数据失败'); }
+    try { const res = await getFeeItems({ page, pageSize, ...filters }); setData(res.data.records); setTotal(res.data.total); } catch (err) { console.error(err); message.error('加载数据失败'); }
     setLoading(false);
   };
 

@@ -6,7 +6,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import { askAiStream } from '../../services/api';
-import { useChatStore, type Conversation, type Message } from '../../stores/chatStore';
+import { useChatStore } from '../../stores/chatStore';
+import type { Conversation, Message } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
 import DocumentViewer from '../../components/DocumentViewer';
 import {
@@ -285,18 +286,21 @@ const AiQa: React.FC = () => {
       question,
       {
         onChunk: (text) => {
+          // 累积到 buffer（最终消息用）
           streamBufferRef.current += text;
-          setStreamingText(streamBufferRef.current);
+          // 更新状态 → 触发实时渲染
+          setStreamingText(streamBufferRef.current); 
         },
         onDone: (info) => {
-          if (doneHandledRef.current) return;
+          // 防重入
+          if (doneHandledRef.current) return; 
           doneHandledRef.current = true;
           addAssistantMessage(
-            streamBufferRef.current,
-            info.source || 'AI_STREAM',
-            info.citations,
+            streamBufferRef.current, // 完整文本
+            info.source || 'AI_STREAM', // 来源标签
+            info.citations, // 引用文献列表
           );
-          setStreamingText('');
+          setStreamingText('');  // 清除流式临时状态
           setLoading(false);
           abortRef.current = null;
         },
@@ -305,7 +309,7 @@ const AiQa: React.FC = () => {
           doneHandledRef.current = true;
           const partial = streamBufferRef.current;
           addAssistantMessage(
-            partial || `抱歉，AI 服务出现了问题：${error}`,
+            partial || `抱歉，AI 服务出现了问题：${error}`,  // 有部分内容就保留
             partial ? 'AI_STREAM' : 'ERROR',
           );
           setStreamingText('');

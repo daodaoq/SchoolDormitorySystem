@@ -3,17 +3,8 @@ import { Table, Button, Space, Modal, Form, Input, Select, InputNumber, message,
 import { PlusOutlined } from '@ant-design/icons';
 import { AlertTriangle } from 'lucide-react';
 import { getDormitories, addDormitory, updateDormitory, deleteDormitory } from '../../services/api';
+import type { DormitoryRecord } from '../../types';
 import { Alert, AlertIcon, AlertTitle } from '@/components/ui/alert-1';
-
-interface DormitoryRecord {
-  id?: number;
-  dormitoryNo: string;
-  building?: string;
-  floor?: string;
-  roomType?: string;
-  capacity?: number;
-  status: string;
-}
 
 const roomTypeOptions = ['单人间', '双人间', '四人间', '六人间'];
 
@@ -32,7 +23,7 @@ const Dormitory: React.FC = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    try { const res = await getDormitories({ page, pageSize, ...filters }); setData(res.data.records); setTotal(res.data.total); } catch { message.error('加载宿舍数据失败'); }
+    try { const res = await getDormitories({ page, pageSize, ...filters }); setData(res.data.records); setTotal(res.data.total); } catch (err) { console.error(err); message.error('加载宿舍数据失败'); }
     setLoading(false);
   };
 
@@ -44,7 +35,8 @@ const Dormitory: React.FC = () => {
       const values = await form.validateFields();
       if (editingId) { await updateDormitory(editingId, values); message.success('更新成功'); }
       else { await addDormitory(values); message.success('添加成功'); }
-      setModalVisible(false); fetchData();
+      setModalVisible(false); 
+      fetchData();
     } catch (e: any) { if (!e?.errorFields) message.error('操作失败，请稍后重试'); }
   };
 

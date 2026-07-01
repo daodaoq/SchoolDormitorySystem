@@ -31,7 +31,8 @@ public class UserController {
             @RequestParam(required = false) String role) {
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(username != null, SysUser::getUsername, username);
-        wrapper.eq(role != null, SysUser::getRole, role);
+        wrapper.eq(role != null,
+                SysUser::getRole, role);
         wrapper.orderByDesc(SysUser::getCreateTime);
         Page<SysUser> result = userMapper.selectPage(new Page<>(page, pageSize), wrapper);
         result.getRecords().forEach(u -> u.setPassword(null));

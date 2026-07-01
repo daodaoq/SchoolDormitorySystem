@@ -28,7 +28,7 @@ const Roles: React.FC = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    try { const res = await getRoles(); setData(res.data); } catch { message.error('加载角色数据失败'); }
+    try { const res = await getRoles(); setData(res.data); } catch (err) { console.error(err); message.error('加载角色数据失败'); }
     setLoading(false);
   };
 
@@ -50,7 +50,7 @@ const Roles: React.FC = () => {
       const res = await getRoleMenus(roleId);
       setMenuTree(res.data.menus);
       setCheckedKeys(res.data.checkedKeys);
-    } catch { message.error('加载权限失败'); }
+    } catch (err) { console.error(err); message.error('加载权限失败'); }
     setPermVisible(true);
   };
 
@@ -101,11 +101,11 @@ const Roles: React.FC = () => {
 
       <Modal title="分配权限" open={permVisible} onOk={handleAssign} onCancel={() => setPermVisible(false)} okText="确定" cancelText="取消" width={500}>
         <Tree
-          checkable defaultExpandAll
+          checkable defaultExpandAll // 显示复选框，允许勾选，默认展开所有节点
           fieldNames={{ title: 'menuName', key: 'id', children: 'children' }}
           treeData={menuTree as any}
-          checkedKeys={checkedKeys}
-          onCheck={(keys) => setCheckedKeys(keys as number[])}
+          checkedKeys={checkedKeys} // 已选中的节点 keys（受控）
+          onCheck={(keys) => setCheckedKeys(keys as number[])} // 勾选变化时更新
         />
       </Modal>
     </div>

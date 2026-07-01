@@ -1,4 +1,5 @@
 import request from '../utils/request';
+import { getToken } from '../utils/token';
 import type { ApiResult, PageResult } from '../types';
 
 // ===== 认证 =====
@@ -150,31 +151,22 @@ export const askAiStream = (
   },
   userId?: string,
 ): AbortController => {
+  // 取消控制器，方便用户随时停止回答
   const abortController = new AbortController();
-
-  const token = (() => {
-    try {
-      const auth = localStorage.getItem('auth');
-      if (auth) {
-        const parsed = JSON.parse(auth);
-        // Zustand v5 persist 格式为 { state: {...}, version: 0 }，v4 为扁平结构
-        return parsed?.state?.token || parsed?.token || '';
-      }
-    } catch { /* ignore */ }
-    return '';
-  })();
+  const token = getToken();
 
   fetch('/api/ai/ask/stream', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}), // 条件添加认证头
     },
     body: JSON.stringify({ question, userId: userId || 'anonymous' }),
-    signal: abortController.signal,
+    signal: abortController.signal, // 绑定取消信号
   })
     .then(async (response) => {
       if (!response.ok) {
+        // 401 未认证 → 清除本地存储并跳转到登录页
         if (response.status === 401) {
           localStorage.removeItem('auth');
           window.location.assign('/login');
@@ -184,6 +176,7 @@ export const askAiStream = (
         return;
       }
 
+      // 流式读取数据
       const reader = response.body?.getReader();
       if (!reader) {
         callbacks.onError('浏览器不支持流式读取');
@@ -191,10 +184,12 @@ export const askAiStream = (
       }
 
       const decoder = new TextDecoder();
+      // 缓冲区，用于拼接不完整的数据块
       let buffer = '';
 
       try {
         while (true) {
+          // SSE协议规定：每个事件以 data: ... 开头，事件之间用 两个换行符 \n\n 分隔。
           const { done, value } = await reader.read();
           if (done) break;
 
@@ -206,7 +201,7 @@ export const askAiStream = (
           if (lastDoubleNewline === -1) continue; // 还没有完整事件
 
           const complete = buffer.substring(0, lastDoubleNewline);
-          buffer = buffer.substring(lastDoubleNewline + 2); // 跳过 \n\n
+          buffer = buffer.substring(lastDoubleNewline + 2); // 跳过 \n\n，保留剩余不完整部分
 
           // 处理所有完整事件（可能有多个事件被 \n\n 连接）
           const events = complete.split('\n\n');
@@ -233,6 +228,18 @@ export const askAiStream = (
   return abortController;
 };
 
+/**
+ * 
+ * event: content
+  data: 这是一段文本内容
+
+  event: done
+  data: {"status": "completed", "totalLength": 100}
+
+  event: error
+  data: 服务器内部错误
+*/
+
 /** 解析单个 SSE 事件块 */
 function parseSSEEvent(
   eventBlock: string,
@@ -257,22 +264,26 @@ function parseSSEEvent(
     // 空行忽略
   }
 
+  // 合并多行数据
   if (dataLines.length === 0) return;
 
   const data = dataLines.join('\n');
 
   switch (eventType) {
     case 'content':
-      callbacks.onChunk(data);
+      callbacks.onChunk(data); // 内容片段，直接传递文本
       break;
     case 'done':
       try {
-        callbacks.onDone(JSON.parse(data));
-      } catch {
+        callbacks.onDone(JSON.parse(data)); // 完成事件，解析 JSON
+      } catch (err) {
+        // 容错处理：如果解析失败，传默认值
+        console.warn('[SSE] done 事件 JSON 解析失败', err, data);
         callbacks.onDone({ status: 'completed' });
       }
       break;
     case 'error':
+      // 错误事件，传递错误信息
       callbacks.onError(data);
       break;
     default:

@@ -50,6 +50,7 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
     private final ModelHealthMonitor healthMonitor;
     private final StreamingResponseHandler streamingHandler;
     private final KbDocumentService kbDocumentService;
+    private final MilvusVectorStoreService milvusService;
     private final RerankService rerankService;
     private final ConversationContextManager contextManager;
     private final QueryRewriteService queryRewriteService;
@@ -64,6 +65,7 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
                            ModelHealthMonitor healthMonitor,
                            StreamingResponseHandler streamingHandler,
                            KbDocumentService kbDocumentService,
+                           MilvusVectorStoreService milvusService,
                            RerankService rerankService,
                            ConversationContextManager contextManager,
                            QueryRewriteService queryRewriteService,
@@ -77,6 +79,7 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
         this.healthMonitor = healthMonitor;
         this.streamingHandler = streamingHandler;
         this.kbDocumentService = kbDocumentService;
+        this.milvusService = milvusService;
         this.rerankService = rerankService;
         this.contextManager = contextManager;
         this.queryRewriteService = queryRewriteService;
@@ -336,6 +339,8 @@ public class AiQaServiceImpl extends ServiceImpl<AiQaLogMapper, AiQaLog> impleme
         status.put("circuitBreaker", healthMonitor.getHealthStatus());
         status.put("localKbEnabled", aiProperties.getLocalKb().isEnabled());
         status.put("fallbackEnabled", aiProperties.getFallback().isEnabled());
+        status.put("milvusAvailable", milvusService.isAvailable());
+        status.put("ragEnabled", milvusService.isAvailable());
         return status;
     }
 
