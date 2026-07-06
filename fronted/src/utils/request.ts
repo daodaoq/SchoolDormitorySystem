@@ -22,6 +22,7 @@ request.interceptors.response.use(
     const res = response.data;
     if (res.code !== 200) {
       if (res.code === 401) {
+        sessionStorage.removeItem('auth');
         localStorage.removeItem('auth');
         // 用 assign 而非直接替换，保留 history 历史
         window.location.assign('/login');
@@ -34,6 +35,7 @@ request.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
+      sessionStorage.removeItem('auth');
       localStorage.removeItem('auth');
       window.location.assign('/login');
       return Promise.reject(new Error('未登录'));

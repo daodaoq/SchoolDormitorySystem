@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { LoginResult, MenuItem } from '../types';
 
 interface AuthState {
@@ -47,9 +47,10 @@ export const useAuthStore = create<AuthState>()(
       hasPermission: (code: string) => get().permissions.includes(code),
     }),
     {
-      // 持久化配置
-      // localStorage 的 key 名称
+      // 使用 sessionStorage：关闭浏览器标签后自动清除，重新打开需重新登录
+      // 页面刷新或 HMR 热更新时保持登录态
       name: 'auth',
+      storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({
         // 只保存这些字段到 localStorage
         user: state.user,
@@ -58,7 +59,7 @@ export const useAuthStore = create<AuthState>()(
         menus: state.menus,
       }),
       onRehydrateStorage: () => (state) => {
-        // 从 localStorage 恢复数据后执行
+        // sessionStorage 恢复数据后执行
         if (state) {
           // 标记初始化完成
           state.setInitialized();

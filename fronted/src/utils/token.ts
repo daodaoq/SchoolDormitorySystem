@@ -6,12 +6,14 @@
  */
 export function getToken(): string {
   try {
-    const auth = localStorage.getItem('auth');
+    // 优先从 sessionStorage（新方案），fallback 到 localStorage（旧数据兼容）
+    const auth = sessionStorage.getItem('auth') || localStorage.getItem('auth');
     if (!auth) return '';
     const parsed = JSON.parse(auth);
     return parsed?.state?.token || parsed?.token || '';
   } catch (err) {
-    console.warn('[token] localStorage auth 数据损坏，已自动清除', err);
+    console.warn('[token] auth 数据损坏，已自动清除', err);
+    sessionStorage.removeItem('auth');
     localStorage.removeItem('auth');
     return '';
   }
@@ -23,11 +25,12 @@ export function getToken(): string {
  */
 export function getAuthData<T = Record<string, any>>(): T | null {
   try {
-    const auth = localStorage.getItem('auth');
+    const auth = sessionStorage.getItem('auth') || localStorage.getItem('auth');
     if (!auth) return null;
     return JSON.parse(auth) as T;
   } catch (err) {
-    console.warn('[token] localStorage auth 数据损坏，已自动清除', err);
+    console.warn('[token] auth 数据损坏，已自动清除', err);
+    sessionStorage.removeItem('auth');
     localStorage.removeItem('auth');
     return null;
   }

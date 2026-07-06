@@ -1,0 +1,144 @@
+@startuml
+
+!option handwritten false
+
+skinparam linetype ortho
+skinparam roundcorner 5
+
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 13
+skinparam defaultFontColor #333333
+
+skinparam actorStyle plain
+skinparam actor {
+  BorderColor #000000
+  BorderThickness 0.8
+  FontSize 13
+  FontColor #000000
+}
+
+skinparam usecase {
+  BackgroundColor #FEFECE
+  BorderColor #8B6914
+  BorderThickness 1.5
+  FontSize 12
+  FontColor #000000
+}
+
+skinparam package {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  BorderThickness 1
+  FontSize 11
+  FontColor #000000
+  FontStyle bold
+}
+
+skinparam rectangle {
+  BackgroundColor #FAFAFA
+  BorderColor #000000
+  BorderThickness 2
+  FontSize 13
+  FontColor #000000
+  FontStyle bold
+}
+
+skinparam arrow {
+  Color #000000
+  Thickness 1
+  FontSize 9
+  FontColor #000000
+}
+
+skinparam nodesep 250
+skinparam ranksep 22
+
+' ============================================================
+left to right direction
+
+actor "学生" as Student
+actor "时间\n<<系统触发>>" as Time
+
+rectangle "学校宿舍管理收费系统" {
+
+  package "学生宿舍信息管理" as PKG_A {
+    usecase "UC01 录入学生信息" as UC01
+    usecase "UC02 查询学生信息" as UC02
+    usecase "UC03 更新学生信息" as UC03
+    usecase "UC04 删除学生信息" as UC04
+    usecase "UC22 智能咨询问答" as UC22
+  }
+
+  package "宿舍收费项目管理" as PKG_B {
+    usecase "UC05 录入收费项目" as UC05
+    usecase "UC06 查询收费项目" as UC06
+    usecase "UC07 编辑收费项目" as UC07
+    usecase "UC08 删除收费项目" as UC08
+    usecase "UC09 调整收费标准" as UC09
+  }
+
+  package "在线缴费" as PKG_D {
+    usecase "UC15 支付宝在线缴费" as UC15
+    usecase "UC16 支付结果回调处理" as UC16
+    usecase "UC17 查询支付记录" as UC17
+  }
+
+  package "缴费记录管理" as PKG_C {
+    usecase "UC10 生成缴费账单" as UC10
+    usecase "UC11 查询账单" as UC11
+    usecase "UC12 更新账单状态" as UC12
+    usecase "UC13 导入缴费记录" as UC13
+    usecase "UC14 导出缴费记录" as UC14
+  }
+
+  package "收费统计与报表" as PKG_E {
+    usecase "UC18 收费情况统计" as UC18
+    usecase "UC19 生成收费报表" as UC19
+    usecase "UC20 导出收费报表" as UC20
+    usecase "UC21 逾期账单提醒" as UC21
+  }
+}
+
+actor "宿舍管理员" as Admin
+actor "支付宝支付系统\n<<外部系统>>" as Alipay
+
+' ============================================================
+
+Student --> UC02
+Student --> UC15
+Student --> UC17
+Student --> UC22
+
+Time --> UC10
+Time --> UC21
+
+Admin --> UC01
+Admin --> UC02
+Admin --> UC03
+Admin --> UC04
+Admin --> UC05
+Admin --> UC06
+Admin --> UC07
+Admin --> UC08
+Admin --> UC09
+Admin --> UC10
+Admin --> UC11
+Admin --> UC12
+Admin --> UC13
+Admin --> UC14
+Admin --> UC17
+Admin --> UC18
+Admin --> UC19
+Admin --> UC20
+Admin --> UC21
+
+Alipay --> UC15
+Alipay --> UC16
+
+UC15 ..> UC16 : <<include>>
+UC15 ..> UC12 : <<include>>
+UC10 ..> UC12 : <<extend>>
+UC19 ..> UC20 : <<extend>>
+UC21 ..> UC10 : <<extend>>
+
+@enduml

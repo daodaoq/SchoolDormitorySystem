@@ -168,6 +168,7 @@ export const askAiStream = (
       if (!response.ok) {
         // 401 未认证 → 清除本地存储并跳转到登录页
         if (response.status === 401) {
+          sessionStorage.removeItem('auth');
           localStorage.removeItem('auth');
           window.location.assign('/login');
           return;

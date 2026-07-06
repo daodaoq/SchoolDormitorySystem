@@ -121,11 +121,24 @@ const Dashboard: React.FC = () => {
       },
       anchor: {
         show: true,
-        size: 12,
-        itemStyle: { color: '#1A1A1A' },
+        showAbove: false,
+        size: 16,
+        itemStyle: {
+          color: '#FFFFFF',
+          borderColor: 'rgba(26,26,26,0.12)',
+          borderWidth: 2,
+        },
       },
       pointer: {
-        show: false,
+        show: true,
+        // 指针长度：从中心延伸到 60% 半径处，与进度条内缘对齐
+        length: '60%',
+        width: 14,
+        // 自定义 SVG：底部窄 → 逐渐加宽 → 头部最宽 → 锐利收尖（倒三角/铲形）
+        icon: 'path://M-1.5,0 L-2,-10 L-4,-22 L-7,-38 L-7,-46 L0,-52 L7,-46 L7,-38 L4,-22 L2,-10 L1.5,0 Z',
+        itemStyle: {
+          color: '#E85D4E',
+        },
       },
       title: {
         show: false,
