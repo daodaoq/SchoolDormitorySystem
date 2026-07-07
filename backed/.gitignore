@@ -31,3 +31,14 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Sensitive credentials & keys ###
+# Application config with real secrets (keep the example template)
+application.yaml
+!application-example.yaml
+
+# Private keys (Alipay sandbox — each developer places their own)
+*.pem
+
+# Certificates (Alipay sandbox — each developer downloads their own)
+*.crt

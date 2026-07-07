@@ -34,8 +34,8 @@ spring:
   rabbitmq:
     host: localhost
     port: 5672
-    username: guest
-    password: guest
+    username: your-rabbitmq-username
+    password: your-rabbitmq-password
     virtual-host: /
     listener:
       simple:
@@ -62,15 +62,24 @@ spring:
           timeout: 5000
           writetimeout: 5000
 
-  # Spring AI (OpenAI)
+  # Spring AI — DeepSeek（OpenAI 兼容协议，仅 Chat）
   ai:
     openai:
-      api-key: your-openai-api-key
-      base-url: https://api.openai.com
+      api-key: your-deepseek-api-key
+      base-url: https://api.deepseek.com
       chat:
+        enabled: true
         options:
-          model: gpt-3.5-turbo
+          model: deepseek-v4-flash
           temperature: 0.7
+          max-tokens: 2048
+      embedding:
+        enabled: false   # 关闭 OpenAI 自动配置的 Embedding，用阿里云百炼替代
+
+# 阿里云百炼 Embedding（独立于 DeepSeek Chat）
+bailian:
+  api-key: your-bailian-api-key
+  embedding-model: text-embedding-v2
 
   # File upload
   servlet:
@@ -96,8 +105,8 @@ mybatis-plus:
 # MinIO Object Storage
 minio:
   endpoint: http://localhost:9000
-  access-key: minioadmin
-  secret-key: minioadmin
+  access-key: your-minio-access-key
+  secret-key: your-minio-secret-key
   bucket-prefix: dormitory
 
 # Server
@@ -115,20 +124,24 @@ logging:
   pattern:
     console: '%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n'
 
-# Alipay Sandbox Config
+# Alipay Sandbox（证书模式）
+# 准备以下文件放入 src/main/resources/ 目录：
+#   1. appPublicCert.crt    — 应用公钥证书（从支付宝开放平台下载）
+#   2. alipayPublicCert.crt — 支付宝公钥证书（从支付宝开放平台下载）
+#   3. alipayRootCert.crt   — 支付宝根证书（从支付宝开放平台下载）
+# 私钥放入 src/main/resources/keys/ 目录：
+#   4. keys/alipay_private_key.pem — 应用私钥（PKCS#8 格式）
 alipay:
-  app-id: your-sandbox-app-id
-  private-key: |
-    -----BEGIN RSA PRIVATE KEY-----
-    your-private-key-here
-    -----END RSA PRIVATE KEY-----
-  alipay-public-key: |
-    -----BEGIN PUBLIC KEY-----
-    your-alipay-public-key-here
-    -----END PUBLIC KEY-----
+  app-id: your-alipay-sandbox-app-id
+  # 应用私钥（PKCS#8 格式），与 appPublicCert.crt 配对
+  private-key: your-alipay-private-key
+  # 证书路径（classpath 下）
+  app-cert-path: appPublicCert.crt
+  alipay-public-cert-path: alipayPublicCert.crt
+  root-cert-path: alipayRootCert.crt
   gateway-url: https://openapi-sandbox.dl.alipaydev.com/gateway.do
-  notify-url: http://your-domain/api/payment/notify
-  return-url: http://your-domain/payment/result
+  notify-url: http://localhost:8080/api/payment/notify
+  return-url: http://localhost:8080/api/payment/callback
   charset: UTF-8
   format: json
   sign-type: RSA2
@@ -143,22 +156,56 @@ notification:
     enabled: false
     rate-limit-per-day: 3
 
-# AI Q&A config
+# Milvus 向量数据库
+milvus:
+  host: localhost
+  port: 19530
+
+# AI Q&A config（应用层配置）
 ai:
   rate-limit:
-    max-requests-per-minute: 5
+    max-requests-per-minute: 10
   cache:
     ttl-seconds: 3600
+  circuit-breaker:
+    failure-threshold: 3
+    open-duration-ms: 30000
+  stream:
+    timeout-seconds: 120
+    heartbeat-interval-ms: 15000
+  local-kb:
+    enabled: true
   fallback:
     enabled: true
+  prompt:
+    system-text: |
+      你是学生宿舍收费管理系统的智能助手"宿管小助手"。
+      你负责解答以下业务相关问题：
+      1. 宿舍信息：学生入住流程、宿舍号查询、宿舍调换申请、住宿管理规定
+      2. 收费标准：住宿费、水费、电费、空调费、网络费等收费项目及标准
+      3. 账单查询：缴费账单生成周期、账单状态（未缴/已缴/逾期）、应缴金额查询
+      4. 在线缴费：支付宝缴费流程、支付状态同步、电子缴费凭证
+      5. 报表导出：月度/学期收费统计报表、缴费率、逾期情况汇总
+      6. 逾期处理：逾期提醒机制、短信/邮件通知、逾期影响及处理方法
+      7. 退费申请：退费条件、退费流程、退款到账时间
+
+      回答要求：
+      - 使用中文，语气友好、专业
+      - 回答简洁明了，分点列出便于阅读
+      - 如果用户问题超出业务范围，礼貌拒绝并引导用户咨询宿舍管理员
+      - 涉及具体学生个人数据时，提醒用户登录系统查看
+
+# Frontend URL（支付完成后重定向用）
+app:
+  frontend-url: http://localhost:3001
 
 # Scheduled tasks
 schedule:
-  overdue-check: "0 0 8 * * ?"
-  stats-precompute: "0 0 2 * * ?"
-  order-timeout: "0 */5 * * * ?"
+  overdue-check: "0 0 8 * * ?"       # 每天 8:00 检查逾期
+  stats-precompute: "0 0 2 * * ?"     # 每天 2:00 预计算统计数据
+  order-timeout: "0 */5 * * * ?"      # 每 5 分钟检查订单超时
 
-# Actuator
+# Actuator（健康检查）
 management:
   endpoints:
     web:
