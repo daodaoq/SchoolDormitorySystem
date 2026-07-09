@@ -125,3 +125,5 @@ public class UserController {
         return Result.ok("密码已重置为 123456");
     }
 }
+// RBAC
+// 用户  用户-角色  角色  用户-权限  权限
